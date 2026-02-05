@@ -1,0 +1,8 @@
+[package]
+name = "candy-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+candy-parser = { path = "../candy-parser" }
+candy-typecheck = { path = "../candy-typecheck" }

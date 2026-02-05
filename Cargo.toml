@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/candy-cli",
+  "crates/candy-parser",
+  "crates/candy-ast",
+  "crates/candy-typecheck",
+  "crates/candy-ir",
+]

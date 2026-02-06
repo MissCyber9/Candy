@@ -1,113 +1,64 @@
-
-
 # TODO — Candy 🍭
 
-## v0.1 Foundations (release gate)
-- [ ] Workspace: single root Cargo.toml, crates under crates/
-- [ ] MVP pipeline: candy-cli prints "Candy🍭: parse+typecheck OK"
-- [ ] Quality: fmt, clippy (-D warnings), tests
-- [ ] CI: GitHub Actions runs fmt/clippy/tests
-- [ ] Docs: README + PHILOSOPHY + TODO
-- [ ] Release hygiene: tag v0.1.0 + GitHub release notes
-- [ ] Handoff: CANDY_STATE.md committed
+This TODO is a release checklist. Keep it short, deterministic, CI-first.
 
-## v0.2 — Type System & Diagnostics (IN PROGRESS / READY FOR TAG)
-
-### Lexer (minimal mais réel)
-- [x] Tokenize identifiers, int literals, keywords (fn/let/return)
-- [x] Tokenize symbols: (), {}, :, ;, =, ->
-- [x] Spans on every token (line/col)
-- [x] Lexer tests (positions, newlines)
-
-### AST with spans
-- [x] Span type (file, start/end line/col)
-- [x] Every AST node carries Span
-
-### Diagnostics
-- [x] Diagnostic { code, severity, message, span, fix? }
-- [x] DiagnosticReport { diagnostics[] } + JSON serialization
-- [x] Diagnostics tests (JSON parseable, schema invariants)
-
-### Parser v0.2
-- [x] Real lexer-based parser
-- [x] Parse errors return DiagnosticReport with spans
-- [x] Parser tests (valid + invalid)
-
-### CLI
-- [x] `candy check <file.candy>`
-- [x] `candy check --agent <file.candy>` outputs JSON only to stdout
-- [x] Agent JSON schema documented (docs/agent-json.md)
-- [x] CLI tests for agent JSON output
-
-### Type system v0.2 (scaffolding)
-- [x] Primitive types: Int, Bool, Unit
-- [x] main() strict: `fn main() -> Unit` with 0 params
-- [x] Let annotations + mismatch diagnostics
-- [x] Unknown name diagnostics
-- [x] Typecheck tests (main invalid, unknown name)
-
-### Quality gates
-- [x] cargo fmt
-- [x] cargo clippy -D warnings
-- [x] cargo test --workspace
-
-
-## v0.3 Secrets & Linear Types
-- [X] `secret` keyword + linear restrictions
-- [X] zeroization on drop
-- [X] forbid secret-dependent branches (static rule)
-
-
-
-## v0.4 — Effects + Determinism Scaffold
-
-A. Lexer / Tokens
-- [ ] keyword `effects`
-- [ ] token `,` (Comma)
-- [ ] string literals `"..."` with spans
-- [ ] lexer tests: effects/comma/string/spans
-
-B. AST
-- [ ] `Effect` enum: Io | Net | Time | Rand (derive Copy/Eq/Ord)
-- [ ] `EffectSpec { effect, span }`
-- [ ] `FnDecl.effects: Vec<EffectSpec>`
-- [ ] `Expr::Call { callee, args, span }`
-- [ ] `Expr::StrLit { value, span }`
-
-C. Parser
-- [ ] parse optional `effects(io, time, rand, net)` in fn signature
-- [ ] spans for each effect item
-- [ ] parse calls `f(...)`
-- [ ] parse string literal expressions
-- [ ] parser tests for effects grammar + calls + strings
-
-D. Typechecker
-- [ ] default pure when effects omitted
-- [ ] intrinsics:
-  - [ ] `log("...")` requires io
-  - [ ] `now()` requires time
-  - [ ] `rand()` requires rand
-- [ ] rules:
-  - [ ] pure uses effectful intrinsic -> `undeclared-effect` + fix add effects(...)
-  - [ ] pure calls effectful function -> `effect-leak` + fix add effects(...)
-- [ ] typecheck tests for effect errors + OK cases
-
-E. CLI / Agent mode
-- [ ] stable JSON codes for effect errors in `candy check --agent`
-- [ ] CLI tests: agent JSON includes `undeclared-effect` and `effect-leak`
-- [ ] docs update: `docs/agent-json.md` add new codes
-
-F. State / Release
-- [ ] update `CANDY_STATE.md` for v0.4 status
-- [ ] tag + GitHub release v0.4.0
-
-## v0.4 — Effects & Determinism (in progress)
-
+## v0.4 — Effects & Determinism (RELEASED: v0.4.0)
 - [x] Lexer: `effects` keyword, comma, string literals
 - [x] AST: `Effect` enum, effect spans, `FnDecl.effects`, `Expr::Call`, `Expr::StrLit`
 - [x] Parser: parse `effects(...)` clause + calls + string literals
 - [x] Typechecker: effects rules + intrinsics + diagnostics (`undeclared-effect`, `effect-leak`)
-- [x] Tests: parser smoke still green + new typecheck effects tests
-- [x] CLI tests: agent JSON effect diagnostics
-- [ ] Update CANDY_STATE.md with v0.4 status (end-of-release)
-- [ ] Tag + GitHub Release v0.4.0
+- [x] CLI agent mode: JSON-only + stable effect error codes
+- [x] Tests: parser/typecheck/CLI tests for effects
+- [x] Docs: `docs/agent-json.md` updated for v0.4 codes
+- [x] State: `CANDY_STATE.md` reflects v0.4.0
+- [x] Tag + GitHub Release: v0.4.0
+
+## v0.5 — Protocol Engine (typed state machines) — IN PROGRESS
+### Parser / Syntax
+- [ ] Add top-level `protocol <Name> { ... }`
+- [ ] Parse `state <Name>;`
+- [ ] Parse `transition <S1> -> <S2> [effects(...)] ;`
+- [ ] Spans on protocol/state/transition keywords + arrow + effect items
+
+### AST
+- [ ] `Item::ProtocolDecl`
+- [ ] `ProtocolDecl { name, states, transitions, span }`
+- [ ] `StateDecl { name, span }`
+- [ ] `TransitionDecl { from, to, effects, span }`
+
+### Typechecker: well-formedness
+- [ ] Duplicate state names => `protocol-duplicate-state`
+- [ ] Transition references unknown state => `protocol-unknown-state`
+- [ ] Duplicate transitions (same from,to) => deterministic error code (to decide)
+
+### Typechecker: protocol tokens + intrinsics
+- [ ] `Type::ProtocolToken { protocol, state, span }`
+- [ ] `enter(P, S)` => token if P exists and S in P
+- [ ] `step(tok, S2)` => legal transition only
+- [ ] Illegal transition => `protocol-illegal-transition`
+- [ ] Unknown protocol => `protocol-unknown`
+
+### Effects gating for transitions
+- [ ] If transition declares effects, `step` requires current function declares them
+- [ ] Missing effects uses existing diagnostics (`undeclared-effect` or `effect-leak`) consistently
+
+### Agent mode JSON
+- [ ] Stable codes:
+  - [ ] `protocol-unknown`
+  - [ ] `protocol-duplicate-state`
+  - [ ] `protocol-unknown-state`
+  - [ ] `protocol-illegal-transition`
+- [ ] Fix suggestions:
+  - [ ] Missing transition => suggest adding `transition S1 -> S2;`
+  - [ ] Missing effects => suggest adding `effects(...)` to function
+
+### Tests
+- [ ] Parser tests: protocol + transitions + transition effects
+- [ ] Typecheck tests: unknown state, illegal transition, effects required, happy path
+- [ ] CLI agent tests: JSON-only + codes appear
+
+### Release
+- [ ] Update `docs/agent-json.md` with protocol codes
+- [ ] Update `CANDY_STATE.md` end-of-release status
+- [ ] Tag v0.5.0
+- [ ] GitHub release notes

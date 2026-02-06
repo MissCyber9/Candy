@@ -112,8 +112,7 @@ impl DiagnosticReport {
 
     /// Agent mode: JSON only, stable schema.
     pub fn to_json_pretty(&self) -> String {
-        serde_json::to_string_pretty(self)
-            .expect("diagnostic JSON serialization must not fail")
+        serde_json::to_string_pretty(self).expect("diagnostic JSON serialization must not fail")
     }
 }
 

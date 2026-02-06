@@ -12,8 +12,10 @@ fn agent_json_is_stable_and_parseable() {
 
     let mut r = DiagnosticReport::new();
     r.push(
-        Diagnostic::error("type-mismatch", "Expected Int, got Bool.", sp)
-            .with_fix("let x: Int = true;".to_string(), "let x: Int = 1;".to_string()),
+        Diagnostic::error("type-mismatch", "Expected Int, got Bool.", sp).with_fix(
+            "let x: Int = true;".to_string(),
+            "let x: Int = 1;".to_string(),
+        ),
     );
 
     let json = r.to_json_pretty();

@@ -1,7 +1,11 @@
 [package]
 name = "candy-typecheck"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
 candy-ast = { path = "../candy-ast" }
+candy-diagnostics = { path = "../candy-diagnostics" }
+
+[dev-dependencies]
+candy-parser = { path = "../candy-parser" }

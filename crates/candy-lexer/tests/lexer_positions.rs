@@ -34,7 +34,10 @@ fn lex_spans_across_newlines() {
     assert_eq!(toks[0].span.start_col, 1);
 
     // return at line 2 col 1
-    let ret = toks.iter().find(|t| matches!(t.kind, TokenKind::KwReturn)).unwrap();
+    let ret = toks
+        .iter()
+        .find(|t| matches!(t.kind, TokenKind::KwReturn))
+        .unwrap();
     assert_eq!(ret.span.start_line, 2);
     assert_eq!(ret.span.start_col, 1);
 }
@@ -44,7 +47,10 @@ fn lex_int_literal_span_is_nonzero() {
     let src = "return 42;";
     let toks = Lexer::new("main.candy", src).lex_all();
 
-    let lit = toks.iter().find(|t| matches!(t.kind, TokenKind::IntLit(42))).unwrap();
+    let lit = toks
+        .iter()
+        .find(|t| matches!(t.kind, TokenKind::IntLit(42)))
+        .unwrap();
     assert_eq!(lit.span.start_line, 1);
     assert!(lit.span.start_col > 0);
     // end_col should be >= start_col

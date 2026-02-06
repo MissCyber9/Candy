@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 candy-parser = { path = "../candy-parser" }
+candy-typecheck = { path = "../candy-typecheck" }
 candy-diagnostics = { path = "../candy-diagnostics" }
 
 [dev-dependencies]

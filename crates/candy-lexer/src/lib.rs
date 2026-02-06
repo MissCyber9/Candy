@@ -31,9 +31,9 @@ pub struct Token {
 pub struct Lexer<'a> {
     file: String,
     src: &'a str,
-    i: usize,   // byte offset
-    line: u32,  // 1-based
-    col: u32,   // 1-based
+    i: usize,  // byte offset
+    line: u32, // 1-based
+    col: u32,  // 1-based
 }
 
 impl<'a> Lexer<'a> {
@@ -109,21 +109,69 @@ impl<'a> Lexer<'a> {
 
         // Single-char symbols
         match ch {
-            '(' => { self.bump(); return Token { kind: TokenKind::LParen, span: self.mk_span(sl, sc, self.line, self.col) }; }
-            ')' => { self.bump(); return Token { kind: TokenKind::RParen, span: self.mk_span(sl, sc, self.line, self.col) }; }
-            '{' => { self.bump(); return Token { kind: TokenKind::LBrace, span: self.mk_span(sl, sc, self.line, self.col) }; }
-            '}' => { self.bump(); return Token { kind: TokenKind::RBrace, span: self.mk_span(sl, sc, self.line, self.col) }; }
-            ':' => { self.bump(); return Token { kind: TokenKind::Colon,  span: self.mk_span(sl, sc, self.line, self.col) }; }
-            ';' => { self.bump(); return Token { kind: TokenKind::Semi,   span: self.mk_span(sl, sc, self.line, self.col) }; }
-            '=' => { self.bump(); return Token { kind: TokenKind::Eq,     span: self.mk_span(sl, sc, self.line, self.col) }; }
+            '(' => {
+                self.bump();
+                return Token {
+                    kind: TokenKind::LParen,
+                    span: self.mk_span(sl, sc, self.line, self.col),
+                };
+            }
+            ')' => {
+                self.bump();
+                return Token {
+                    kind: TokenKind::RParen,
+                    span: self.mk_span(sl, sc, self.line, self.col),
+                };
+            }
+            '{' => {
+                self.bump();
+                return Token {
+                    kind: TokenKind::LBrace,
+                    span: self.mk_span(sl, sc, self.line, self.col),
+                };
+            }
+            '}' => {
+                self.bump();
+                return Token {
+                    kind: TokenKind::RBrace,
+                    span: self.mk_span(sl, sc, self.line, self.col),
+                };
+            }
+            ':' => {
+                self.bump();
+                return Token {
+                    kind: TokenKind::Colon,
+                    span: self.mk_span(sl, sc, self.line, self.col),
+                };
+            }
+            ';' => {
+                self.bump();
+                return Token {
+                    kind: TokenKind::Semi,
+                    span: self.mk_span(sl, sc, self.line, self.col),
+                };
+            }
+            '=' => {
+                self.bump();
+                return Token {
+                    kind: TokenKind::Eq,
+                    span: self.mk_span(sl, sc, self.line, self.col),
+                };
+            }
             '-' => {
                 self.bump();
                 if self.peek() == Some('>') {
                     self.bump();
-                    return Token { kind: TokenKind::Arrow, span: self.mk_span(sl, sc, self.line, self.col) };
+                    return Token {
+                        kind: TokenKind::Arrow,
+                        span: self.mk_span(sl, sc, self.line, self.col),
+                    };
                 }
                 // v0.2 minimal: treat lone '-' as identifier to keep lexer total.
-                return Token { kind: TokenKind::Ident("-".into()), span: self.mk_span(sl, sc, self.line, self.col) };
+                return Token {
+                    kind: TokenKind::Ident("-".into()),
+                    span: self.mk_span(sl, sc, self.line, self.col),
+                };
             }
             _ => {}
         }
@@ -135,7 +183,10 @@ impl<'a> Lexer<'a> {
                 s.push(self.bump().unwrap());
             }
             let v = s.parse::<i64>().unwrap_or(0);
-            return Token { kind: TokenKind::IntLit(v), span: self.mk_span(sl, sc, self.line, self.col) };
+            return Token {
+                kind: TokenKind::IntLit(v),
+                span: self.mk_span(sl, sc, self.line, self.col),
+            };
         }
 
         // identifier / keyword
@@ -152,11 +203,17 @@ impl<'a> Lexer<'a> {
                 _ => TokenKind::Ident(s),
             };
 
-            return Token { kind, span: self.mk_span(sl, sc, self.line, self.col) };
+            return Token {
+                kind,
+                span: self.mk_span(sl, sc, self.line, self.col),
+            };
         }
 
         // unknown: consume 1 char, return as Ident to avoid lexer failure in v0.2
         self.bump();
-        Token { kind: TokenKind::Ident(ch.to_string()), span: self.mk_span(sl, sc, self.line, self.col) }
+        Token {
+            kind: TokenKind::Ident(ch.to_string()),
+            span: self.mk_span(sl, sc, self.line, self.col),
+        }
     }
 }

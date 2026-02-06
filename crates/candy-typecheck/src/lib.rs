@@ -25,7 +25,8 @@ fn lower_type(t: &Type) -> Ty {
         Type::Int { .. } => Ty::Int,
         Type::Bool { .. } => Ty::Bool,
         Type::Unit { .. } => Ty::Unit,
-        Type::Named { .. } => Ty::Unknown, // v0.2: only primitives are real
+        Type::Secret { inner, .. } => lower_type(inner),
+        Type::Named { .. } => Ty::Unknown, // v0.3: named types not supported yet
     }
 }
 

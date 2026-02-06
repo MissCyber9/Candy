@@ -53,8 +53,8 @@
 
 
 ## v0.3 Secrets & Linear Types
-- [ ] `secret` keyword + linear restrictions
-- [ ] zeroization on drop
-- [ ] forbid secret-dependent branches (static rule)
+- [X] `secret` keyword + linear restrictions
+- [X] zeroization on drop
+- [X] forbid secret-dependent branches (static rule)
 
 

@@ -1,59 +1,56 @@
-# CANDY_STATE (canonical)
+# Candy 🍭 — Project State
 
-## Current
-- Repo: https://github.com/MissCyber9/Candy
-- Local: ~/projects/Candy/candy
+## Current version
+- Target release: v0.3.0
 - Branch: main
-- Version milestone: v0.2.0 (Diagnostics + Agent mode + Type scaffolding)
-- Commit signing: disabled (NO GPG) — `git config commit.gpgsign false`
+- Repo: https://github.com/MissCyber9/Candy
 
-## v0.2.0 — What’s in
-### Diagnostics
-- `candy-diagnostics`: Span + Diagnostic + DiagnosticReport
-- Stable JSON schema for agent mode
-- Tests validate JSON parseability and schema invariants
+## What is completed (v0.3.0)
+### Language surface
+- Minimal functions + let + return
+- Types: Int, Bool, Unit
+- Secret wrapper type: `secret T`
+- Expressions:
+  - literals (Int/Bool)
+  - variable reference
+  - `move(x)` (ownership transfer)
+- Statements:
+  - let-binding with optional type annotation
+  - return
+  - if/else
 
-### Lexer + Parser
-- `candy-lexer`: minimal tokenization + line/col spans + tests
-- `candy-parser`: lexer-based parsing → spanned AST or DiagnosticReport
-- Parser tests for valid + invalid inputs (spanned diagnostics)
+### Crypto-safety by design (v0.3 MVP)
+- Secrets cannot be copied (`secret-copy`)
+- Secrets can be transferred via `move(x)`
+- Use-after-move is rejected (`use-after-move`)
+- Branching on secret condition is forbidden (`secret-branch`)
 
-### AST
-- `candy-ast`: all nodes carry Span (Ident/Type/Expr/Stmt/FnDecl/Program)
+### Diagnostics & agent usability
+- Structured diagnostics (code, severity, message, span, optional fix)
+- CLI:
+  - `candy check <file.candy>`
+  - `candy check --agent <file.candy>` outputs JSON ONLY on stdout
+- Agent tests:
+  - JSON-only contract verified
+  - Secret diagnostics verified (race-free via unique tmp files)
 
-### Type system (v0.2 scope)
-- `candy-typecheck`: Int/Bool/Unit scaffolding
-- main() strict validation
-- let annotation + mismatch diagnostics
-- unknown name diagnostics
-- Typecheck tests
-
-### CLI
-- `candy check file.candy`
-- `candy check --agent file.candy` => JSON only on stdout
-- docs: `docs/agent-json.md`
-- CLI test validates JSON output
-
-## Repro commands
+## Repro commands (must pass)
 ```bash
 cargo fmt
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 
-# Example
-cargo run -p candy-cli -- check --agent examples/hello.candy
+
 Known pitfalls
 
-If git commit fails due to GPG: git config commit.gpgsign false
+CLI tests must use unique temp files (tests run in parallel).
 
-Agent mode contract: stdout must be JSON only; logs go to stderr.
+CLI --agent is accepted in any position (flag semantics).
 
-Next (v0.3 focus)
+Next version focus (v0.4)
 
-secret keyword + linear/affine resource tracking
+Effects system (io/net/time/rand) with determinism by default
 
-Automatic zeroization on drop
+Deterministic logs / audit trail primitives
 
-Forbidden secret-dependent control flow
-
-Nonce safety / crypto-safe stdlib wrappers (later v0.8+ per roadmap)
+Extend parser incrementally without adding runtime magic

@@ -278,6 +278,15 @@ impl<'a> Parser<'a> {
 
     fn parse_type(&mut self) -> Type {
         match &self.cur.kind {
+            TokenKind::KwSecret => {
+                let sp = self.cur.span.clone();
+                self.bump(); // consume `secret`
+                let inner = self.parse_type();
+                Type::Secret {
+                    inner: Box::new(inner),
+                    span: sp,
+                }
+            }
             TokenKind::Ident(s) => {
                 let sp = self.cur.span.clone();
                 let name = s.clone();

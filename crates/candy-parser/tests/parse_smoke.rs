@@ -21,3 +21,11 @@ fn parse_reports_error_with_span() {
     assert!(d0.span.start_line >= 1);
     assert!(d0.span.start_col >= 1);
 }
+
+#[test]
+fn parse_secret_type_in_let() {
+    let src = "fn main() -> Unit { let x: secret Int = 1; return; }";
+    let p = parse_file("main.candy", src).unwrap();
+    assert_eq!(p.funcs.len(), 1);
+    // Just smoke: if it parsed, we’re good for now.
+}

@@ -56,3 +56,12 @@ fn lex_int_literal_span_is_nonzero() {
     // end_col should be >= start_col
     assert!(lit.span.end_col >= lit.span.start_col);
 }
+
+#[test]
+fn lex_secret_keyword() {
+    let src = "let x: secret Int = 1;";
+    let toks = candy_lexer::Lexer::new("main.candy", src).lex_all();
+    assert!(toks
+        .iter()
+        .any(|t| matches!(t.kind, candy_lexer::TokenKind::KwSecret)));
+}

@@ -4,6 +4,7 @@ use candy_diagnostics::Span;
 pub enum TokenKind {
     Ident(String),
     IntLit(i64),
+    StrLit(String),
 
     KwFn,
     KwLet,
@@ -11,6 +12,7 @@ pub enum TokenKind {
     KwSecret,
     KwIf,
     KwElse,
+    KwEffects,
 
     LParen,
     RParen,
@@ -110,6 +112,28 @@ impl<'a> Lexer<'a> {
             };
         };
 
+        // string literal: "..."
+        if ch == '"' {
+            self.bump(); // consume opening quote
+            let mut s = String::new();
+            while let Some(c) = self.peek() {
+                if c == '"' {
+                    self.bump(); // consume closing quote
+                    return Token {
+                        kind: TokenKind::StrLit(s),
+                        span: self.mk_span(sl, sc, self.line, self.col),
+                    };
+                }
+                // v0.4 minimal: allow any char except EOF; no escape handling yet
+                s.push(self.bump().unwrap());
+            }
+            // Unterminated string: keep lexer total (like unknown tokens) by returning Ident
+            return Token {
+                kind: TokenKind::Ident("\"".into()),
+                span: self.mk_span(sl, sc, self.line, self.col),
+            };
+        }
+
         // Single-char symbols
         match ch {
             '(' => {
@@ -206,6 +230,7 @@ impl<'a> Lexer<'a> {
                 "secret" => TokenKind::KwSecret,
                 "if" => TokenKind::KwIf,
                 "else" => TokenKind::KwElse,
+                "effects" => TokenKind::KwEffects,
                 _ => TokenKind::Ident(s),
             };
 

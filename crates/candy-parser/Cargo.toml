@@ -1,7 +1,9 @@
 [package]
 name = "candy-parser"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
 candy-ast = { path = "../candy-ast" }
+candy-lexer = { path = "../candy-lexer" }
+candy-diagnostics = { path = "../candy-diagnostics" }

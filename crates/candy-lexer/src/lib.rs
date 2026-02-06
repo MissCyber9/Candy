@@ -100,6 +100,35 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    fn lex_string(&mut self, sl: u32, sc: u32) -> Token {
+        // current is '"'
+        self.bump(); // consume opening quote
+        let mut s = String::new();
+
+        while let Some(ch) = self.peek() {
+            if ch == '"' {
+                self.bump(); // consume closing quote
+                return Token {
+                    kind: TokenKind::StrLit(s),
+                    span: self.mk_span(sl, sc, self.line, self.col),
+                };
+            }
+
+            // v0.4 minimal: no escapes. newline ends string (error recovery as Ident)
+            if ch == '\n' {
+                break;
+            }
+
+            s.push(self.bump().unwrap());
+        }
+
+        // Unterminated string: recover by emitting Ident token to avoid lexer failure.
+        Token {
+            kind: TokenKind::Ident("\"".into()),
+            span: self.mk_span(sl, sc, self.line, self.col),
+        }
+    }
+
     pub fn next_token(&mut self) -> Token {
         self.skip_ws();
 
@@ -112,28 +141,6 @@ impl<'a> Lexer<'a> {
                 span: self.mk_span(sl, sc, sl, sc),
             };
         };
-
-        // string literal: "..."
-        if ch == '"' {
-            self.bump(); // opening quote
-            let mut s = String::new();
-            while let Some(c) = self.peek() {
-                if c == '"' {
-                    self.bump(); // closing quote
-                    return Token {
-                        kind: TokenKind::StrLit(s),
-                        span: self.mk_span(sl, sc, self.line, self.col),
-                    };
-                }
-                // v0.4 minimal: no escapes yet
-                s.push(self.bump().unwrap());
-            }
-            // Unterminated: keep lexer total
-            return Token {
-                kind: TokenKind::Ident("\"".into()),
-                span: self.mk_span(sl, sc, self.line, self.col),
-            };
-        }
 
         // Single-char symbols
         match ch {
@@ -193,6 +200,9 @@ impl<'a> Lexer<'a> {
                     span: self.mk_span(sl, sc, self.line, self.col),
                 };
             }
+            '"' => {
+                return self.lex_string(sl, sc);
+            }
             '-' => {
                 self.bump();
                 if self.peek() == Some('>') {
@@ -247,7 +257,7 @@ impl<'a> Lexer<'a> {
             };
         }
 
-        // unknown: consume 1 char, return as Ident to keep lexer total
+        // unknown: consume 1 char, return as Ident to avoid lexer failure
         self.bump();
         Token {
             kind: TokenKind::Ident(ch.to_string()),

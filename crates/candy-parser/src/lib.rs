@@ -252,6 +252,33 @@ impl<'a> Parser<'a> {
                 self.bump();
                 Expr::BoolLit { value: b, span: sp }
             }
+            TokenKind::Ident(s) if s == "move" => {
+                // move(<ident>)
+                let move_span = self.cur.span.clone();
+                self.bump(); // consume "move"
+
+                self.expect_kind(
+                    TokenKind::LParen,
+                    "parse-expected-lparen",
+                    "Expected `(` after move.",
+                );
+
+                let name = self.parse_ident(
+                    "parse-expected-ident",
+                    "Expected identifier inside move(...).",
+                );
+
+                self.expect_kind(
+                    TokenKind::RParen,
+                    "parse-expected-rparen",
+                    "Expected `)` after move argument.",
+                );
+
+                Expr::Move {
+                    name,
+                    span: move_span,
+                }
+            }
             TokenKind::Ident(_) => {
                 let id = self.parse_ident("parse-expected-ident", "Expected identifier.");
                 let sp = id.span.clone();

@@ -11,13 +11,17 @@ pub enum Type {
     Int { span: Span },
     Bool { span: Span },
     Unit { span: Span },
+    Secret { inner: Box<Type>, span: Span },
     Named { name: String, span: Span },
 }
 
 impl Type {
     pub fn span(&self) -> &Span {
         match self {
-            Type::Int { span } | Type::Bool { span } | Type::Unit { span } => span,
+            Type::Int { span }
+            | Type::Bool { span }
+            | Type::Unit { span }
+            | Type::Secret { span, .. } => span,
             Type::Named { span, .. } => span,
         }
     }
@@ -74,6 +78,7 @@ pub enum Expr {
     IntLit { value: i64, span: Span },
     BoolLit { value: bool, span: Span },
     Var { name: Ident, span: Span },
+    Move { name: Ident, span: Span },
 }
 
 impl Expr {
@@ -82,6 +87,7 @@ impl Expr {
             Expr::IntLit { span, .. } => span,
             Expr::BoolLit { span, .. } => span,
             Expr::Var { span, .. } => span,
+            Expr::Move { span, .. } => span,
         }
     }
 }

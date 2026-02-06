@@ -4,35 +4,56 @@
 - Repo: https://github.com/MissCyber9/Candy
 - Local: ~/projects/Candy/candy
 - Branch: main
-- Current milestone: v0.1 closure → start v0.2
+- Version milestone: v0.2.0 (Diagnostics + Agent mode + Type scaffolding)
+- Commit signing: disabled (NO GPG) — `git config commit.gpgsign false`
 
-## Commit signing
-- Policy: NO GPG signing for Candy early releases.
-- Local repo setting: `git config commit.gpgsign false`
+## v0.2.0 — What’s in
+### Diagnostics
+- `candy-diagnostics`: Span + Diagnostic + DiagnosticReport
+- Stable JSON schema for agent mode
+- Tests validate JSON parseability and schema invariants
 
-## v0.1 status — Foundations (expected)
-- Workspace crates: candy-cli, candy-parser, candy-ast, candy-typecheck
-- Pipeline: parse → typecheck → CLI (verify via cargo test)
-- CI: should be green
+### Lexer + Parser
+- `candy-lexer`: minimal tokenization + line/col spans + tests
+- `candy-parser`: lexer-based parsing → spanned AST or DiagnosticReport
+- Parser tests for valid + invalid inputs (spanned diagnostics)
 
-## What changed in this window
-- Created this state file to make progress portable across ChatGPT windows.
-- Next: tag v0.1.0 + GitHub release notes + TODO closeout.
+### AST
+- `candy-ast`: all nodes carry Span (Ident/Type/Expr/Stmt/FnDecl/Program)
 
-## Repro (quality gates)
+### Type system (v0.2 scope)
+- `candy-typecheck`: Int/Bool/Unit scaffolding
+- main() strict validation
+- let annotation + mismatch diagnostics
+- unknown name diagnostics
+- Typecheck tests
+
+### CLI
+- `candy check file.candy`
+- `candy check --agent file.candy` => JSON only on stdout
+- docs: `docs/agent-json.md`
+- CLI test validates JSON output
+
+## Repro commands
 ```bash
-cargo metadata --no-deps
 cargo fmt
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-Next steps
 
-Close v0.1:
+# Example
+cargo run -p candy-cli -- check --agent examples/hello.candy
+Known pitfalls
 
-Update docs/TODO.md to mark v0.1 complete
+If git commit fails due to GPG: git config commit.gpgsign false
 
-Commit + tag v0.1.0 (NO SIGN) + push
+Agent mode contract: stdout must be JSON only; logs go to stderr.
 
-Draft GitHub release notes
+Next (v0.3 focus)
 
-v0.2 focus: lexer + spans + diagnostics + agent JSON + type scaffolding
+secret keyword + linear/affine resource tracking
+
+Automatic zeroization on drop
+
+Forbidden secret-dependent control flow
+
+Nonce safety / crypto-safe stdlib wrappers (later v0.8+ per roadmap)

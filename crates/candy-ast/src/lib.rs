@@ -27,6 +27,20 @@ impl Type {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Effect {
+    Io,
+    Net,
+    Time,
+    Rand,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EffectSpec {
+    pub effect: Effect,
+    pub span: Span,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Program {
     pub funcs: Vec<FnDecl>,
@@ -38,6 +52,7 @@ pub struct FnDecl {
     pub name: Ident,
     pub params: Vec<Param>,
     pub ret: Type,
+    pub effects: Vec<EffectSpec>, // v0.4: empty => pure
     pub body: Block,
     pub span: Span,
 }
@@ -81,10 +96,31 @@ pub enum Stmt {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
-    IntLit { value: i64, span: Span },
-    BoolLit { value: bool, span: Span },
-    Var { name: Ident, span: Span },
-    Move { name: Ident, span: Span },
+    IntLit {
+        value: i64,
+        span: Span,
+    },
+    BoolLit {
+        value: bool,
+        span: Span,
+    },
+    StrLit {
+        value: String,
+        span: Span,
+    },
+    Var {
+        name: Ident,
+        span: Span,
+    },
+    Move {
+        name: Ident,
+        span: Span,
+    },
+    Call {
+        callee: Ident,
+        args: Vec<Expr>,
+        span: Span,
+    },
 }
 
 impl Expr {
@@ -92,8 +128,10 @@ impl Expr {
         match self {
             Expr::IntLit { span, .. } => span,
             Expr::BoolLit { span, .. } => span,
+            Expr::StrLit { span, .. } => span,
             Expr::Var { span, .. } => span,
             Expr::Move { span, .. } => span,
+            Expr::Call { span, .. } => span,
         }
     }
 }

@@ -1,7 +1,8 @@
 use std::fs;
 
-use candy_diagnostics::DiagnosticReport;
+use candy_diagnostics::{Diagnostic, DiagnosticReport, Span};
 use candy_parser::parse_file;
+use candy_typecheck::typecheck;
 
 fn print_usage() {
     eprintln!(
@@ -12,12 +13,13 @@ fn print_usage() {
 fn render_human(report: &DiagnosticReport) {
     for d in &report.diagnostics {
         eprintln!(
-            "[{:?}] {}: {} ({}:{}-{}:{})",
+            "[{:?}] {}: {} ({}:{}:{}-{}:{})",
             d.severity,
             d.code,
             d.message,
             d.span.file,
             d.span.start_line,
+            d.span.start_col,
             d.span.end_line,
             d.span.end_col
         );
@@ -30,24 +32,20 @@ fn render_human(report: &DiagnosticReport) {
 fn main() {
     let mut args: Vec<String> = std::env::args().collect();
 
-    // args[0] = binary
     if args.len() < 2 {
         print_usage();
         std::process::exit(2);
     }
 
     let cmd = args[1].as_str();
-
     if cmd != "check" {
         print_usage();
         std::process::exit(2);
     }
 
-    // Parse flags + file
     let mut agent = false;
     let mut file: Option<String> = None;
 
-    // consume after "check"
     let rest = args.drain(2..).collect::<Vec<_>>();
     for a in rest {
         if a == "--agent" {
@@ -70,34 +68,28 @@ fn main() {
     let src = match fs::read_to_string(&path) {
         Ok(s) => s,
         Err(e) => {
+            let mut r = DiagnosticReport::new();
+            r.push(Diagnostic::error(
+                "io-read-failed",
+                format!("Failed to read file: {e}"),
+                Span::unknown(path.clone()),
+            ));
+
             if agent {
-                // JSON-only even for IO errors
-                let mut r = DiagnosticReport::new();
-                r.push(candy_diagnostics::Diagnostic::error(
-                    "io-read-failed",
-                    format!("Failed to read file: {e}"),
-                    candy_diagnostics::Span::unknown(path.clone()),
-                ));
                 println!("{}", r.to_json_pretty());
             } else {
-                eprintln!("error: failed to read {}: {}", path, e);
+                render_human(&r);
             }
             std::process::exit(1);
         }
     };
 
-    match parse_file(&path, &src) {
-        Ok(_program) => {
-            if agent {
-                // JSON-only: empty diagnostics list
-                let r = DiagnosticReport::new();
-                println!("{}", r.to_json_pretty());
-            } else {
-                eprintln!("ok");
-            }
-            std::process::exit(0);
-        }
-        Err(report) => {
+    let mut report = DiagnosticReport::new();
+
+    let program = match parse_file(&path, &src) {
+        Ok(p) => p,
+        Err(mut r) => {
+            report.diagnostics.append(&mut r.diagnostics);
             if agent {
                 println!("{}", report.to_json_pretty());
             } else {
@@ -105,5 +97,19 @@ fn main() {
             }
             std::process::exit(1);
         }
+    };
+
+    if let Err(mut r) = typecheck(&program) {
+        report.diagnostics.append(&mut r.diagnostics);
     }
+
+    if agent {
+        println!("{}", report.to_json_pretty());
+    } else if report.is_ok() {
+        eprintln!("ok");
+    } else {
+        render_human(&report);
+    }
+
+    std::process::exit(if report.is_ok() { 0 } else { 1 });
 }

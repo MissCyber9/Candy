@@ -37,7 +37,7 @@ fn lower_type(t: &Type) -> Ty {
         Type::Bool { .. } => Ty::Bool,
         Type::Unit { .. } => Ty::Unit,
         Type::Secret { inner, .. } => lower_type(inner),
-        Type::Named { .. } => Ty::Unknown, // v0.3: named types not supported yet
+        Type::Named { .. } => Ty::Unknown,
     }
 }
 
@@ -121,6 +121,9 @@ fn typecheck_fn(f: &FnDecl, r: &mut DiagnosticReport) {
         );
     }
 
+    // v0.4: f.effects exists but is not enforced until effects commit.
+    let _ = &f.effects;
+
     for s in &f.body.stmts {
         typecheck_stmt(s, &mut env, &ret, r);
     }
@@ -133,12 +136,7 @@ fn typecheck_stmt(
     r: &mut DiagnosticReport,
 ) {
     match s {
-        Stmt::Let {
-            name,
-            ty,
-            expr,
-            span: _,
-        } => {
+        Stmt::Let { name, ty, expr, .. } => {
             let rhs = type_of_expr(expr, env, r);
 
             let (ann_ty, ann_secret) = if let Some(ann) = ty {
@@ -166,8 +164,6 @@ fn typecheck_stmt(
                 (rhs.ty.clone(), rhs.is_secret)
             };
 
-            // secret-copy rule:
-            // if RHS is secret and expression was a Var (not Move), then copying is forbidden.
             if rhs.is_secret && rhs.copied_secret {
                 r.push(
                     Diagnostic::error(
@@ -198,7 +194,7 @@ fn typecheck_stmt(
 
         Stmt::Return { expr, span } => match (ret, expr) {
             (Ty::Unit, None) => {}
-            (Ty::Unit, Some(_e)) => {
+            (Ty::Unit, Some(_)) => {
                 r.push(Diagnostic::error(
                     "return-mismatch",
                     "Return value provided but function returns Unit.",
@@ -227,11 +223,12 @@ fn typecheck_stmt(
                 }
             }
         },
+
         Stmt::If {
             cond,
             then_blk,
             else_blk,
-            span,
+            ..
         } => {
             let ct = type_of_expr(cond, env, r);
 
@@ -251,7 +248,6 @@ fn typecheck_stmt(
                 ));
             }
 
-            // typecheck then block in same env (v0.3 minimal; later we can use scoped env)
             for st in &then_blk.stmts {
                 typecheck_stmt(st, env, ret, r);
             }
@@ -261,11 +257,9 @@ fn typecheck_stmt(
                     typecheck_stmt(st, env, ret, r);
                 }
             }
-
-            let _ = span;
         }
 
-        Stmt::Expr { expr, span: _ } => {
+        Stmt::Expr { expr, .. } => {
             let _ = type_of_expr(expr, env, r);
         }
     }
@@ -275,9 +269,7 @@ fn typecheck_stmt(
 struct ExprTy {
     ty: Ty,
     is_secret: bool,
-    // true only when a secret var is used as a plain Var (copy attempt)
     copied_secret: bool,
-    // name for better diagnostics/fixes
     name_hint: Option<String>,
 }
 
@@ -295,85 +287,96 @@ fn type_of_expr(e: &Expr, env: &mut HashMap<String, VarInfo>, r: &mut Diagnostic
             copied_secret: false,
             name_hint: None,
         },
+        Expr::StrLit { .. } => ExprTy {
+            ty: Ty::Unknown,
+            is_secret: false,
+            copied_secret: false,
+            name_hint: None,
+        },
 
-        Expr::Var { name, .. } => {
-            match env.get(&name.name) {
-                Some(v) => {
-                    if v.moved {
-                        r.push(Diagnostic::error(
-                            "use-after-move",
-                            format!("Use of `{}` after it was moved.", name.name),
-                            name.span.clone(),
-                        ));
-                        return ExprTy {
-                            ty: Ty::Unknown,
-                            is_secret: v.is_secret,
-                            copied_secret: false,
-                            name_hint: Some(name.name.clone()),
-                        };
-                    }
-
-                    ExprTy {
-                        ty: v.ty.clone(),
-                        is_secret: v.is_secret,
-                        copied_secret: v.is_secret, // var use is a copy attempt for secrets unless wrapped by Move
-                        name_hint: Some(name.name.clone()),
-                    }
-                }
-                None => {
+        Expr::Var { name, .. } => match env.get(&name.name) {
+            Some(v) => {
+                if v.moved {
                     r.push(Diagnostic::error(
-                        "name-unknown",
-                        format!("Unknown name `{}`.", name.name),
+                        "use-after-move",
+                        format!("Use of `{}` after it was moved.", name.name),
                         name.span.clone(),
                     ));
-                    ExprTy {
+                    return ExprTy {
                         ty: Ty::Unknown,
-                        is_secret: false,
+                        is_secret: v.is_secret,
                         copied_secret: false,
                         name_hint: Some(name.name.clone()),
-                    }
+                    };
+                }
+
+                ExprTy {
+                    ty: v.ty.clone(),
+                    is_secret: v.is_secret,
+                    copied_secret: v.is_secret,
+                    name_hint: Some(name.name.clone()),
                 }
             }
-        }
+            None => {
+                r.push(Diagnostic::error(
+                    "name-unknown",
+                    format!("Unknown name `{}`.", name.name),
+                    name.span.clone(),
+                ));
+                ExprTy {
+                    ty: Ty::Unknown,
+                    is_secret: false,
+                    copied_secret: false,
+                    name_hint: Some(name.name.clone()),
+                }
+            }
+        },
 
-        Expr::Move { name, .. } => {
-            match env.get_mut(&name.name) {
-                Some(v) => {
-                    if v.moved {
-                        r.push(Diagnostic::error(
-                            "use-after-move",
-                            format!("Value `{}` was already moved.", name.name),
-                            name.span.clone(),
-                        ));
-                        return ExprTy {
-                            ty: Ty::Unknown,
-                            is_secret: v.is_secret,
-                            copied_secret: false,
-                            name_hint: Some(name.name.clone()),
-                        };
-                    }
-                    // move consumes ownership (only meaningful for secrets, but allowed for any var)
-                    v.moved = true;
-                    ExprTy {
-                        ty: v.ty.clone(),
+        Expr::Move { name, .. } => match env.get_mut(&name.name) {
+            Some(v) => {
+                if v.moved {
+                    r.push(Diagnostic::error(
+                        "use-after-move",
+                        format!("Use of `{}` after it was moved.", name.name),
+                        name.span.clone(),
+                    ));
+                    return ExprTy {
+                        ty: Ty::Unknown,
                         is_secret: v.is_secret,
                         copied_secret: false,
                         name_hint: Some(name.name.clone()),
-                    }
+                    };
                 }
-                None => {
-                    r.push(Diagnostic::error(
-                        "name-unknown",
-                        format!("Unknown name `{}`.", name.name),
-                        name.span.clone(),
-                    ));
-                    ExprTy {
-                        ty: Ty::Unknown,
-                        is_secret: false,
-                        copied_secret: false,
-                        name_hint: Some(name.name.clone()),
-                    }
+                v.moved = true;
+                ExprTy {
+                    ty: v.ty.clone(),
+                    is_secret: v.is_secret,
+                    copied_secret: false,
+                    name_hint: Some(name.name.clone()),
                 }
+            }
+            None => {
+                r.push(Diagnostic::error(
+                    "name-unknown",
+                    format!("Unknown name `{}`.", name.name),
+                    name.span.clone(),
+                ));
+                ExprTy {
+                    ty: Ty::Unknown,
+                    is_secret: false,
+                    copied_secret: false,
+                    name_hint: Some(name.name.clone()),
+                }
+            }
+        },
+
+        Expr::Call { callee, .. } => {
+            // v0.4 scaffold: treat calls as unknown-typed for now; effects checked in next commit.
+            ExprTy {
+                ty: Ty::Unknown,
+                is_secret: false,
+                copied_secret: false,
+                name_hint: Some(callee.name.clone()),
             }
         }
     }

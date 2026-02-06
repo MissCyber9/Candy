@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
-use candy_ast::{Expr, FnDecl, Program, Stmt, Type};
-use candy_diagnostics::{Diagnostic, DiagnosticReport};
+use candy_ast::{Effect, Expr, FnDecl, Program, Stmt, Type};
+use candy_diagnostics::{Diagnostic, DiagnosticReport, Span};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Ty {
@@ -41,13 +41,62 @@ fn lower_type(t: &Type) -> Ty {
     }
 }
 
+fn effect_name(e: Effect) -> &'static str {
+    match e {
+        Effect::Io => "io",
+        Effect::Net => "net",
+        Effect::Time => "time",
+        Effect::Rand => "rand",
+    }
+}
+
+fn fmt_effects_list(effs: &BTreeSet<Effect>) -> String {
+    let mut v: Vec<&'static str> = effs.iter().map(|e| effect_name(*e)).collect();
+    v.sort();
+    v.join(", ")
+}
+
+fn effects_set_of_fn(f: &FnDecl) -> BTreeSet<Effect> {
+    let mut set = BTreeSet::new();
+    for s in &f.effects {
+        set.insert(s.effect);
+    }
+    set
+}
+
+fn pretty_ret(t: &Type) -> &'static str {
+    match t {
+        Type::Int { .. } => "Int",
+        Type::Bool { .. } => "Bool",
+        Type::Unit { .. } => "Unit",
+        Type::Secret { .. } => "secret ...",
+        Type::Named { .. } => "...",
+    }
+}
+
+fn make_effects_fix(f: &FnDecl, proposed: &BTreeSet<Effect>) -> (String, String) {
+    let replace = format!("fn {}(...) -> {} {{", f.name.name, pretty_ret(&f.ret));
+    let with = format!(
+        "fn {}(...) -> {} effects({}) {{",
+        f.name.name,
+        pretty_ret(&f.ret),
+        fmt_effects_list(proposed)
+    );
+    (replace, with)
+}
+
 pub fn typecheck(p: &Program) -> Result<(), DiagnosticReport> {
     let mut r = DiagnosticReport::new();
+
+    let mut fn_effects: HashMap<String, BTreeSet<Effect>> = HashMap::new();
+    for f in &p.funcs {
+        fn_effects.insert(f.name.name.clone(), effects_set_of_fn(f));
+    }
 
     check_main(p, &mut r);
 
     for f in &p.funcs {
-        typecheck_fn(f, &mut r);
+        typecheck_fn(f, &fn_effects, &mut r);
     }
 
     if r.is_ok() {
@@ -97,8 +146,13 @@ fn check_main(p: &Program, r: &mut DiagnosticReport) {
     }
 }
 
-fn typecheck_fn(f: &FnDecl, r: &mut DiagnosticReport) {
+fn typecheck_fn(
+    f: &FnDecl,
+    fn_effects: &HashMap<String, BTreeSet<Effect>>,
+    r: &mut DiagnosticReport,
+) {
     let ret = lower_type(&f.ret);
+    let current_effects = effects_set_of_fn(f);
 
     let mut env: HashMap<String, VarInfo> = HashMap::new();
 
@@ -107,7 +161,7 @@ fn typecheck_fn(f: &FnDecl, r: &mut DiagnosticReport) {
         if pt == Ty::Unknown {
             r.push(Diagnostic::error(
                 "type-unknown",
-                "Unknown parameter type (v0.3 supports Int|Bool|Unit and secret wrappers).",
+                "Unknown parameter type (Candy supports Int|Bool|Unit and secret wrappers).",
                 p.ty.span().clone(),
             ));
         }
@@ -121,11 +175,8 @@ fn typecheck_fn(f: &FnDecl, r: &mut DiagnosticReport) {
         );
     }
 
-    // v0.4: f.effects exists but is not enforced until effects commit.
-    let _ = &f.effects;
-
     for s in &f.body.stmts {
-        typecheck_stmt(s, &mut env, &ret, r);
+        typecheck_stmt(s, &mut env, &ret, &current_effects, f, fn_effects, r);
     }
 }
 
@@ -133,11 +184,14 @@ fn typecheck_stmt(
     s: &Stmt,
     env: &mut HashMap<String, VarInfo>,
     ret: &Ty,
+    current_effects: &BTreeSet<Effect>,
+    current_fn: &FnDecl,
+    fn_effects: &HashMap<String, BTreeSet<Effect>>,
     r: &mut DiagnosticReport,
 ) {
     match s {
         Stmt::Let { name, ty, expr, .. } => {
-            let rhs = type_of_expr(expr, env, r);
+            let rhs = type_of_expr(expr, env, current_effects, current_fn, fn_effects, r);
 
             let (ann_ty, ann_secret) = if let Some(ann) = ty {
                 let at = lower_type(ann);
@@ -145,7 +199,7 @@ fn typecheck_stmt(
                 if at == Ty::Unknown {
                     r.push(Diagnostic::error(
                         "type-unknown",
-                        "Unknown annotated type (v0.3 supports Int|Bool|Unit and secret wrappers).",
+                        "Unknown annotated type (Candy supports Int|Bool|Unit and secret wrappers).",
                         ann.span().clone(),
                     ));
                 } else if rhs.ty != Ty::Unknown && rhs.ty != at {
@@ -176,8 +230,16 @@ fn typecheck_stmt(
                         expr.span().clone(),
                     )
                     .with_fix(
-                        format!("let {} = {};", name.name, rhs.name_hint.clone().unwrap_or("x".into())),
-                        format!("let {} = move({});", name.name, rhs.name_hint.clone().unwrap_or("x".into())),
+                        format!(
+                            "let {} = {};",
+                            name.name,
+                            rhs.name_hint.clone().unwrap_or("x".into())
+                        ),
+                        format!(
+                            "let {} = move({});",
+                            name.name,
+                            rhs.name_hint.clone().unwrap_or("x".into())
+                        ),
                     ),
                 );
             }
@@ -209,7 +271,7 @@ fn typecheck_stmt(
                 ));
             }
             (rt, Some(e)) => {
-                let et = type_of_expr(e, env, r);
+                let et = type_of_expr(e, env, current_effects, current_fn, fn_effects, r);
                 if et.ty != Ty::Unknown && et.ty != *rt {
                     r.push(Diagnostic::error(
                         "return-mismatch",
@@ -230,7 +292,7 @@ fn typecheck_stmt(
             else_blk,
             ..
         } => {
-            let ct = type_of_expr(cond, env, r);
+            let ct = type_of_expr(cond, env, current_effects, current_fn, fn_effects, r);
 
             if ct.ty != Ty::Bool && ct.ty != Ty::Unknown {
                 r.push(Diagnostic::error(
@@ -249,18 +311,18 @@ fn typecheck_stmt(
             }
 
             for st in &then_blk.stmts {
-                typecheck_stmt(st, env, ret, r);
+                typecheck_stmt(st, env, ret, current_effects, current_fn, fn_effects, r);
             }
 
             if let Some(eb) = else_blk {
                 for st in &eb.stmts {
-                    typecheck_stmt(st, env, ret, r);
+                    typecheck_stmt(st, env, ret, current_effects, current_fn, fn_effects, r);
                 }
             }
         }
 
         Stmt::Expr { expr, .. } => {
-            let _ = type_of_expr(expr, env, r);
+            let _ = type_of_expr(expr, env, current_effects, current_fn, fn_effects, r);
         }
     }
 }
@@ -273,7 +335,88 @@ struct ExprTy {
     name_hint: Option<String>,
 }
 
-fn type_of_expr(e: &Expr, env: &mut HashMap<String, VarInfo>, r: &mut DiagnosticReport) -> ExprTy {
+fn require_effect(
+    required: Effect,
+    call_site: Span,
+    current_effects: &BTreeSet<Effect>,
+    current_fn: &FnDecl,
+    r: &mut DiagnosticReport,
+) {
+    if current_effects.contains(&required) {
+        return;
+    }
+
+    let mut proposed = current_effects.clone();
+    proposed.insert(required);
+
+    let (replace, with) = make_effects_fix(current_fn, &proposed);
+
+    r.push(
+        Diagnostic::error(
+            "undeclared-effect",
+            format!(
+                "Operation requires effect `{}`; add it to function `{}`.",
+                effect_name(required),
+                current_fn.name.name
+            ),
+            call_site,
+        )
+        .with_fix(replace, with),
+    );
+}
+
+fn require_effects_for_call(
+    callee: &str,
+    call_site: Span,
+    current_effects: &BTreeSet<Effect>,
+    current_fn: &FnDecl,
+    fn_effects: &HashMap<String, BTreeSet<Effect>>,
+    r: &mut DiagnosticReport,
+) {
+    let Some(needed) = fn_effects.get(callee) else {
+        return;
+    };
+
+    let mut missing = BTreeSet::new();
+    for e in needed {
+        if !current_effects.contains(e) {
+            missing.insert(*e);
+        }
+    }
+    if missing.is_empty() {
+        return;
+    }
+
+    let mut proposed = current_effects.clone();
+    for e in &missing {
+        proposed.insert(*e);
+    }
+
+    let (replace, with) = make_effects_fix(current_fn, &proposed);
+
+    r.push(
+        Diagnostic::error(
+            "effect-leak",
+            format!(
+                "Calling `{}` requires effects ({}) in `{}`.",
+                callee,
+                fmt_effects_list(needed),
+                current_fn.name.name
+            ),
+            call_site,
+        )
+        .with_fix(replace, with),
+    );
+}
+
+fn type_of_expr(
+    e: &Expr,
+    env: &mut HashMap<String, VarInfo>,
+    current_effects: &BTreeSet<Effect>,
+    current_fn: &FnDecl,
+    fn_effects: &HashMap<String, BTreeSet<Effect>>,
+    r: &mut DiagnosticReport,
+) -> ExprTy {
     match e {
         Expr::IntLit { .. } => ExprTy {
             ty: Ty::Int,
@@ -348,6 +491,7 @@ fn type_of_expr(e: &Expr, env: &mut HashMap<String, VarInfo>, r: &mut Diagnostic
                     };
                 }
                 v.moved = true;
+
                 ExprTy {
                     ty: v.ty.clone(),
                     is_secret: v.is_secret,
@@ -370,13 +514,88 @@ fn type_of_expr(e: &Expr, env: &mut HashMap<String, VarInfo>, r: &mut Diagnostic
             }
         },
 
-        Expr::Call { callee, .. } => {
-            // v0.4 scaffold: treat calls as unknown-typed for now; effects checked in next commit.
+        Expr::Call { callee, args, span } => {
+            match callee.name.as_str() {
+                "log" => {
+                    require_effect(Effect::Io, span.clone(), current_effects, current_fn, r);
+                    if args.len() != 1 {
+                        r.push(Diagnostic::error(
+                            "call-arity",
+                            "log expects exactly 1 argument.",
+                            callee.span.clone(),
+                        ));
+                    }
+                    for a in args {
+                        let _ = type_of_expr(a, env, current_effects, current_fn, fn_effects, r);
+                    }
+                    return ExprTy {
+                        ty: Ty::Unit,
+                        is_secret: false,
+                        copied_secret: false,
+                        name_hint: None,
+                    };
+                }
+                "now" => {
+                    require_effect(Effect::Time, span.clone(), current_effects, current_fn, r);
+                    if !args.is_empty() {
+                        r.push(Diagnostic::error(
+                            "call-arity",
+                            "now expects 0 arguments.",
+                            callee.span.clone(),
+                        ));
+                    }
+                    return ExprTy {
+                        ty: Ty::Int,
+                        is_secret: false,
+                        copied_secret: false,
+                        name_hint: None,
+                    };
+                }
+                "rand" => {
+                    require_effect(Effect::Rand, span.clone(), current_effects, current_fn, r);
+                    if !args.is_empty() {
+                        r.push(Diagnostic::error(
+                            "call-arity",
+                            "rand expects 0 arguments.",
+                            callee.span.clone(),
+                        ));
+                    }
+                    return ExprTy {
+                        ty: Ty::Int,
+                        is_secret: false,
+                        copied_secret: false,
+                        name_hint: None,
+                    };
+                }
+                _ => {}
+            }
+
+            if !fn_effects.contains_key(&callee.name) {
+                r.push(Diagnostic::error(
+                    "name-unknown",
+                    format!("Unknown name `{}`.", callee.name),
+                    callee.span.clone(),
+                ));
+            } else {
+                require_effects_for_call(
+                    &callee.name,
+                    span.clone(),
+                    current_effects,
+                    current_fn,
+                    fn_effects,
+                    r,
+                );
+            }
+
+            for a in args {
+                let _ = type_of_expr(a, env, current_effects, current_fn, fn_effects, r);
+            }
+
             ExprTy {
                 ty: Ty::Unknown,
                 is_secret: false,
                 copied_secret: false,
-                name_hint: Some(callee.name.clone()),
+                name_hint: None,
             }
         }
     }

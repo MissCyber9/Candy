@@ -165,6 +165,7 @@ impl<'a> Parser<'a> {
         match self.cur.kind {
             TokenKind::KwLet => self.parse_let(),
             TokenKind::KwReturn => self.parse_return(),
+            TokenKind::KwIf => self.parse_if(),
             _ => {
                 let expr = self.parse_expr();
                 let semi = self
@@ -232,6 +233,41 @@ impl<'a> Parser<'a> {
         Stmt::Return {
             expr,
             span: ret_span,
+        }
+    }
+
+    fn parse_if(&mut self) -> Stmt {
+        let if_span = self.cur.span.clone();
+        self.bump(); // consume `if`
+
+        self.expect_kind(
+            TokenKind::LParen,
+            "parse-expected-lparen",
+            "Expected `(` after if.",
+        );
+
+        let cond = self.parse_expr();
+
+        self.expect_kind(
+            TokenKind::RParen,
+            "parse-expected-rparen",
+            "Expected `)` after if condition.",
+        );
+
+        let then_blk = self.parse_block();
+
+        let else_blk = if self.cur.kind == TokenKind::KwElse {
+            self.bump(); // consume `else`
+            Some(self.parse_block())
+        } else {
+            None
+        };
+
+        Stmt::If {
+            cond,
+            then_blk,
+            else_blk,
+            span: if_span,
         }
     }
 

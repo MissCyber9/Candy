@@ -227,6 +227,43 @@ fn typecheck_stmt(
                 }
             }
         },
+        Stmt::If {
+            cond,
+            then_blk,
+            else_blk,
+            span,
+        } => {
+            let ct = type_of_expr(cond, env, r);
+
+            if ct.ty != Ty::Bool && ct.ty != Ty::Unknown {
+                r.push(Diagnostic::error(
+                    "if-cond-not-bool",
+                    format!("If condition must be Bool, got {}.", ty_name(&ct.ty)),
+                    cond.span().clone(),
+                ));
+            }
+
+            if ct.is_secret {
+                r.push(Diagnostic::error(
+                    "secret-branch",
+                    "Branching on secret data is forbidden.",
+                    cond.span().clone(),
+                ));
+            }
+
+            // typecheck then block in same env (v0.3 minimal; later we can use scoped env)
+            for st in &then_blk.stmts {
+                typecheck_stmt(st, env, ret, r);
+            }
+
+            if let Some(eb) = else_blk {
+                for st in &eb.stmts {
+                    typecheck_stmt(st, env, ret, r);
+                }
+            }
+
+            let _ = span;
+        }
 
         Stmt::Expr { expr, span: _ } => {
             let _ = type_of_expr(expr, env, r);

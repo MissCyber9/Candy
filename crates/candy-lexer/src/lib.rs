@@ -9,6 +9,8 @@ pub enum TokenKind {
     KwLet,
     KwReturn,
     KwSecret,
+    KwIf,
+    KwElse,
 
     LParen,
     RParen,
@@ -202,6 +204,8 @@ impl<'a> Lexer<'a> {
                 "let" => TokenKind::KwLet,
                 "return" => TokenKind::KwReturn,
                 "secret" => TokenKind::KwSecret,
+                "if" => TokenKind::KwIf,
+                "else" => TokenKind::KwElse,
                 _ => TokenKind::Ident(s),
             };
 

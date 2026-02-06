@@ -67,6 +67,12 @@ pub enum Stmt {
         expr: Option<Expr>,
         span: Span,
     },
+    If {
+        cond: Expr,
+        then_blk: Block,
+        else_blk: Option<Block>,
+        span: Span,
+    },
     Expr {
         expr: Expr,
         span: Span,

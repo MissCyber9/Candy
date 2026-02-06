@@ -65,3 +65,15 @@ fn lex_secret_keyword() {
         .iter()
         .any(|t| matches!(t.kind, candy_lexer::TokenKind::KwSecret)));
 }
+
+#[test]
+fn lex_if_else_keywords() {
+    let src = "if (true) { return; } else { return; }";
+    let toks = candy_lexer::Lexer::new("main.candy", src).lex_all();
+    assert!(toks
+        .iter()
+        .any(|t| matches!(t.kind, candy_lexer::TokenKind::KwIf)));
+    assert!(toks
+        .iter()
+        .any(|t| matches!(t.kind, candy_lexer::TokenKind::KwElse)));
+}

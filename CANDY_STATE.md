@@ -54,3 +54,21 @@ Effects system (io/net/time/rand) with determinism by default
 Deterministic logs / audit trail primitives
 
 Extend parser incrementally without adding runtime magic
+
+## v0.4 (Effects & Determinism) — status
+
+Implemented (main branch):
+- Function effect annotations: `effects(io, net, time, rand)` (optional; default pure)
+- Intrinsics (typecheck-only):
+  - `log("...")` requires `io`
+  - `now()` requires `time` returns `Int`
+  - `rand()` requires `rand` returns `Int`
+- Determinism rule: pure functions may not perform effectful operations.
+- Diagnostics:
+  - `undeclared-effect` with fix hint to add `effects(...)`
+  - `effect-leak` with fix hint to add required effects to caller
+- Agent mode: JSON output includes stable codes above (tests added)
+
+Non-goals maintained:
+- No changes to secret semantics beyond v0.3
+- No protocol/crypto/IR/backend work in v0.4

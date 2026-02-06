@@ -3,10 +3,15 @@ name = "candy-cli"
 version = "0.2.0"
 edition = "2021"
 
+[[bin]]
+name = "candy"
+path = "src/main.rs"
+
 [dependencies]
 candy-parser = { path = "../candy-parser" }
 candy-typecheck = { path = "../candy-typecheck" }
 candy-diagnostics = { path = "../candy-diagnostics" }
+serde_json = "1.0"
 
 [dev-dependencies]
-serde_json = "1"
+tempfile = "3"

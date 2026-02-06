@@ -58,3 +58,56 @@
 - [X] forbid secret-dependent branches (static rule)
 
 
+
+## v0.4 — Effects + Determinism Scaffold
+
+A. Lexer / Tokens
+- [ ] keyword `effects`
+- [ ] token `,` (Comma)
+- [ ] string literals `"..."` with spans
+- [ ] lexer tests: effects/comma/string/spans
+
+B. AST
+- [ ] `Effect` enum: Io | Net | Time | Rand (derive Copy/Eq/Ord)
+- [ ] `EffectSpec { effect, span }`
+- [ ] `FnDecl.effects: Vec<EffectSpec>`
+- [ ] `Expr::Call { callee, args, span }`
+- [ ] `Expr::StrLit { value, span }`
+
+C. Parser
+- [ ] parse optional `effects(io, time, rand, net)` in fn signature
+- [ ] spans for each effect item
+- [ ] parse calls `f(...)`
+- [ ] parse string literal expressions
+- [ ] parser tests for effects grammar + calls + strings
+
+D. Typechecker
+- [ ] default pure when effects omitted
+- [ ] intrinsics:
+  - [ ] `log("...")` requires io
+  - [ ] `now()` requires time
+  - [ ] `rand()` requires rand
+- [ ] rules:
+  - [ ] pure uses effectful intrinsic -> `undeclared-effect` + fix add effects(...)
+  - [ ] pure calls effectful function -> `effect-leak` + fix add effects(...)
+- [ ] typecheck tests for effect errors + OK cases
+
+E. CLI / Agent mode
+- [ ] stable JSON codes for effect errors in `candy check --agent`
+- [ ] CLI tests: agent JSON includes `undeclared-effect` and `effect-leak`
+- [ ] docs update: `docs/agent-json.md` add new codes
+
+F. State / Release
+- [ ] update `CANDY_STATE.md` for v0.4 status
+- [ ] tag + GitHub release v0.4.0
+
+## v0.4 — Effects & Determinism (in progress)
+
+- [x] Lexer: `effects` keyword, comma, string literals
+- [x] AST: `Effect` enum, effect spans, `FnDecl.effects`, `Expr::Call`, `Expr::StrLit`
+- [x] Parser: parse `effects(...)` clause + calls + string literals
+- [x] Typechecker: effects rules + intrinsics + diagnostics (`undeclared-effect`, `effect-leak`)
+- [x] Tests: parser smoke still green + new typecheck effects tests
+- [x] CLI tests: agent JSON effect diagnostics
+- [ ] Update CANDY_STATE.md with v0.4 status (end-of-release)
+- [ ] Tag + GitHub Release v0.4.0

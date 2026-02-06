@@ -52,7 +52,7 @@ pub struct FnDecl {
     pub name: Ident,
     pub params: Vec<Param>,
     pub ret: Type,
-    pub effects: Vec<EffectSpec>, // v0.4: empty => pure
+    pub effects: Vec<EffectSpec>, // v0.4: default pure when empty
     pub body: Block,
     pub span: Span,
 }
@@ -108,6 +108,7 @@ pub enum Expr {
         value: String,
         span: Span,
     },
+
     Var {
         name: Ident,
         span: Span,
@@ -116,6 +117,7 @@ pub enum Expr {
         name: Ident,
         span: Span,
     },
+
     Call {
         callee: Ident,
         args: Vec<Expr>,

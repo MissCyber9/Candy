@@ -6,19 +6,25 @@ on:
   pull_request:
 
 jobs:
-  rust:
+  build-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable + components)
+        uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
-      - name: fmt
-        run: cargo fmt --check
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
 
-      - name: clippy
+      - name: Cargo fmt (check)
+        run: cargo fmt --all -- --check
+
+      - name: Cargo clippy (deny warnings)
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: test
+      - name: Cargo test
         run: cargo test --workspace

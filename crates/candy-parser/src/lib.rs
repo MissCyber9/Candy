@@ -1,4 +1,4 @@
-use candy_ast::{Block, Expr, FnDecl, Ident, Param, Program, Stmt, Type};
+use candy_ast::{Block, Effect, EffectSpec, Expr, FnDecl, Ident, Param, Program, Stmt, Type};
 use candy_diagnostics::{Diagnostic, DiagnosticReport, Span};
 use candy_lexer::{Lexer, Token, TokenKind};
 
@@ -77,7 +77,6 @@ impl<'a> Parser<'a> {
             _ => {
                 let sp = self.cur.span.clone();
                 self.err("parse-expected-fn", "Expected `fn`.", sp.clone());
-                // recovery: consume one token, pretend fn starts here
                 self.bump();
                 sp
             }
@@ -107,14 +106,98 @@ impl<'a> Parser<'a> {
 
         let ret = self.parse_type();
 
+        // v0.4: optional effects(...) after return type
+        let effects = if self.cur.kind == TokenKind::KwEffects {
+            self.parse_effects_clause()
+        } else {
+            vec![]
+        };
+
         let body = self.parse_block();
 
         FnDecl {
             name,
             params,
             ret,
+            effects,
             body,
             span: fn_span,
+        }
+    }
+
+    fn parse_effects_clause(&mut self) -> Vec<EffectSpec> {
+        // effects(io, time, rand, net)
+        let kw_span = self.cur.span.clone();
+        let _ = kw_span;
+        self.bump(); // consume `effects`
+
+        self.expect_kind(
+            TokenKind::LParen,
+            "parse-expected-lparen",
+            "Expected `(` after effects.",
+        );
+
+        let mut out = Vec::new();
+
+        if self.cur.kind != TokenKind::RParen {
+            loop {
+                let (eff, sp) = self.parse_effect_item();
+                out.push(EffectSpec {
+                    effect: eff,
+                    span: sp,
+                });
+
+                if self.cur.kind == TokenKind::Comma {
+                    self.bump(); // consume comma
+                    continue;
+                }
+                break;
+            }
+        }
+
+        self.expect_kind(
+            TokenKind::RParen,
+            "parse-expected-rparen",
+            "Expected `)` after effects list.",
+        );
+
+        out
+    }
+
+    fn parse_effect_item(&mut self) -> (Effect, Span) {
+        match &self.cur.kind {
+            TokenKind::Ident(s) => {
+                let sp = self.cur.span.clone();
+                let eff = match s.as_str() {
+                    "io" => Some(Effect::Io),
+                    "net" => Some(Effect::Net),
+                    "time" => Some(Effect::Time),
+                    "rand" => Some(Effect::Rand),
+                    _ => None,
+                };
+                self.bump();
+                match eff {
+                    Some(e) => (e, sp),
+                    None => {
+                        self.err(
+                            "parse-unknown-effect",
+                            "Unknown effect (expected io|net|time|rand).",
+                            sp.clone(),
+                        );
+                        (Effect::Io, sp) // recovery placeholder
+                    }
+                }
+            }
+            _ => {
+                let sp = self.cur.span.clone();
+                self.err(
+                    "parse-expected-effect",
+                    "Expected effect name (io|net|time|rand).",
+                    sp.clone(),
+                );
+                self.bump();
+                (Effect::Io, sp)
+            }
         }
     }
 
@@ -282,6 +365,15 @@ impl<'a> Parser<'a> {
                     span: sp,
                 }
             }
+            TokenKind::StrLit(s) => {
+                let sp = self.cur.span.clone();
+                let ss = s.clone();
+                self.bump();
+                Expr::StrLit {
+                    value: ss,
+                    span: sp,
+                }
+            }
             TokenKind::Ident(s) if s == "true" || s == "false" => {
                 let sp = self.cur.span.clone();
                 let b = s == "true";
@@ -316,9 +408,46 @@ impl<'a> Parser<'a> {
                 }
             }
             TokenKind::Ident(_) => {
+                // identifier or call
                 let id = self.parse_ident("parse-expected-ident", "Expected identifier.");
-                let sp = id.span.clone();
-                Expr::Var { name: id, span: sp }
+                let start_sp = id.span.clone();
+
+                if self.cur.kind == TokenKind::LParen {
+                    // call: id(expr, expr, ...)
+                    let call_span = start_sp.clone();
+                    self.bump(); // consume '('
+
+                    let mut args = Vec::new();
+                    if self.cur.kind != TokenKind::RParen {
+                        loop {
+                            let a = self.parse_expr();
+                            args.push(a);
+
+                            if self.cur.kind == TokenKind::Comma {
+                                self.bump();
+                                continue;
+                            }
+                            break;
+                        }
+                    }
+
+                    self.expect_kind(
+                        TokenKind::RParen,
+                        "parse-expected-rparen",
+                        "Expected `)` after call arguments.",
+                    );
+
+                    Expr::Call {
+                        callee: id,
+                        args,
+                        span: call_span,
+                    }
+                } else {
+                    Expr::Var {
+                        name: id,
+                        span: start_sp,
+                    }
+                }
             }
             _ => {
                 let sp = self.cur.span.clone();

@@ -1,0 +1,7 @@
+[package]
+name = "candy-lexer"
+version = "0.2.0"
+edition = "2021"
+
+[dependencies]
+candy-diagnostics = { path = "../candy-diagnostics" }

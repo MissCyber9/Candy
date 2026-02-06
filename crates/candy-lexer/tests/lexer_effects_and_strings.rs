@@ -5,6 +5,7 @@ fn lex_effects_keyword() {
     let src = "effects(io, time)";
     let toks = Lexer::new("<memory>", src).lex_all();
     assert!(matches!(toks[0].kind, TokenKind::KwEffects));
+    assert!(toks.iter().any(|t| matches!(t.kind, TokenKind::Comma)));
 }
 
 #[test]

@@ -20,6 +20,7 @@ pub enum TokenKind {
     RBrace,
     Colon,
     Semi,
+    Comma,
     Eq,
     Arrow, // ->
 
@@ -114,20 +115,20 @@ impl<'a> Lexer<'a> {
 
         // string literal: "..."
         if ch == '"' {
-            self.bump(); // consume opening quote
+            self.bump(); // opening quote
             let mut s = String::new();
             while let Some(c) = self.peek() {
                 if c == '"' {
-                    self.bump(); // consume closing quote
+                    self.bump(); // closing quote
                     return Token {
                         kind: TokenKind::StrLit(s),
                         span: self.mk_span(sl, sc, self.line, self.col),
                     };
                 }
-                // v0.4 minimal: allow any char except EOF; no escape handling yet
+                // v0.4 minimal: no escapes yet
                 s.push(self.bump().unwrap());
             }
-            // Unterminated string: keep lexer total (like unknown tokens) by returning Ident
+            // Unterminated: keep lexer total
             return Token {
                 kind: TokenKind::Ident("\"".into()),
                 span: self.mk_span(sl, sc, self.line, self.col),
@@ -178,6 +179,13 @@ impl<'a> Lexer<'a> {
                     span: self.mk_span(sl, sc, self.line, self.col),
                 };
             }
+            ',' => {
+                self.bump();
+                return Token {
+                    kind: TokenKind::Comma,
+                    span: self.mk_span(sl, sc, self.line, self.col),
+                };
+            }
             '=' => {
                 self.bump();
                 return Token {
@@ -194,7 +202,6 @@ impl<'a> Lexer<'a> {
                         span: self.mk_span(sl, sc, self.line, self.col),
                     };
                 }
-                // v0.2 minimal: treat lone '-' as identifier to keep lexer total.
                 return Token {
                     kind: TokenKind::Ident("-".into()),
                     span: self.mk_span(sl, sc, self.line, self.col),
@@ -240,7 +247,7 @@ impl<'a> Lexer<'a> {
             };
         }
 
-        // unknown: consume 1 char, return as Ident to avoid lexer failure in v0.2
+        // unknown: consume 1 char, return as Ident to keep lexer total
         self.bump();
         Token {
             kind: TokenKind::Ident(ch.to_string()),

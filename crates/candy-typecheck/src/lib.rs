@@ -604,7 +604,7 @@ fn type_of_expr(
 }
 
 fn typecheck_protocols(protocols: &[candy_ast::ProtocolDecl], r: &mut DiagnosticReport) {
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
     for proto in protocols {
         // ---- collect states + duplicate detection ----
@@ -631,10 +631,28 @@ fn typecheck_protocols(protocols: &[candy_ast::ProtocolDecl], r: &mut Diagnostic
                 format!("Protocol `{}` declares no states.", proto.name.name),
                 proto.span.clone(),
             ));
+            continue; // nothing else to do safely
+        }
+
+        // ---- init rule (v0.5.x convention) ----
+        let init = "Init".to_string();
+        if !states.contains(&init) {
+            r.push(Diagnostic::error(
+                "protocol-missing-init",
+                format!("Protocol `{}` must declare state `Init`.", proto.name.name),
+                proto.span.clone(),
+            ));
         }
 
         // ---- transitions: unknown state + duplicate edge ----
         let mut seen_edges: BTreeSet<(String, String)> = BTreeSet::new();
+        let mut out_deg: BTreeMap<String, usize> = BTreeMap::new();
+        let mut adj: BTreeMap<String, Vec<String>> = BTreeMap::new();
+
+        for st in states.iter() {
+            out_deg.insert(st.clone(), 0);
+            adj.insert(st.clone(), Vec::new());
+        }
 
         for tr in &proto.transitions {
             let from = tr.from.name.clone();
@@ -671,6 +689,61 @@ fn typecheck_protocols(protocols: &[candy_ast::ProtocolDecl], r: &mut Diagnostic
                         from, to, proto.name.name
                     ),
                     tr.span.clone(),
+                ));
+            }
+
+            // Only build graph for well-formed endpoints
+            if states.contains(&from) && states.contains(&to) {
+                if let Some(v) = out_deg.get_mut(&from) {
+                    *v += 1;
+                }
+                if let Some(v) = adj.get_mut(&from) {
+                    v.push(to);
+                }
+            }
+        }
+
+        // ---- reachability (unreachable states) ----
+        if states.contains(&init) {
+            let mut seen: BTreeSet<String> = BTreeSet::new();
+            let mut q: VecDeque<String> = VecDeque::new();
+            seen.insert(init.clone());
+            q.push_back(init.clone());
+
+            while let Some(cur) = q.pop_front() {
+                let nexts = adj.get(&cur).cloned().unwrap_or_default();
+                for n in nexts {
+                    if seen.insert(n.clone()) {
+                        q.push_back(n);
+                    }
+                }
+            }
+
+            for st in states.iter() {
+                if st != &init && !seen.contains(st) {
+                    r.push(Diagnostic::error(
+                        "protocol-unreachable-state",
+                        format!(
+                            "State `{}` is unreachable from `Init` in protocol `{}`.",
+                            st, proto.name.name
+                        ),
+                        proto.span.clone(),
+                    ));
+                }
+            }
+        }
+
+        // ---- dead-end states (no outgoing transitions) ----
+        for st in states.iter() {
+            let deg = *out_deg.get(st).unwrap_or(&0);
+            if deg == 0 {
+                r.push(Diagnostic::error(
+                    "protocol-dead-end-state",
+                    format!(
+                        "State `{}` has no outgoing transitions in protocol `{}`.",
+                        st, proto.name.name
+                    ),
+                    proto.span.clone(),
                 ));
             }
         }

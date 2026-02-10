@@ -1,38 +1,22 @@
-name: CI
+name: ci
 
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*" ]
   pull_request:
 
 jobs:
-  fmt:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
-      - uses: Swatinem/rust-cache@v2
-      - name: fmt (check)
+          components: rustfmt, clippy
+      - name: fmt
         run: cargo fmt --all -- --check
-
-  clippy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-      - name: clippy (deny warnings)
+      - name: clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
-
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
       - name: test
         run: cargo test --workspace

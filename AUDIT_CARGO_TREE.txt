@@ -1,0 +1,52 @@
+candy-ast v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-ast)
+└── candy-diagnostics v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-diagnostics)
+    ├── serde v1.0.228
+    │   ├── serde_core v1.0.228
+    │   └── serde_derive v1.0.228 (proc-macro)
+    │       ├── proc-macro2 v1.0.106
+    │       │   └── unicode-ident v1.0.22
+    │       ├── quote v1.0.44
+    │       │   └── proc-macro2 v1.0.106 (*)
+    │       └── syn v2.0.114
+    │           ├── proc-macro2 v1.0.106 (*)
+    │           ├── quote v1.0.44 (*)
+    │           └── unicode-ident v1.0.22
+    └── serde_json v1.0.149
+        ├── itoa v1.0.17
+        ├── memchr v2.7.6
+        ├── serde_core v1.0.228
+        └── zmij v1.0.19
+
+candy-cli v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-cli)
+├── candy-diagnostics v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-diagnostics) (*)
+├── candy-parser v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-parser)
+│   ├── candy-ast v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-ast) (*)
+│   ├── candy-diagnostics v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-diagnostics) (*)
+│   └── candy-lexer v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-lexer)
+│       └── candy-diagnostics v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-diagnostics) (*)
+├── candy-typecheck v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-typecheck)
+│   ├── candy-ast v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-ast) (*)
+│   └── candy-diagnostics v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-diagnostics) (*)
+│   [dev-dependencies]
+│   └── candy-parser v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-parser) (*)
+└── serde_json v1.0.149 (*)
+[dev-dependencies]
+└── tempfile v3.24.0
+    ├── fastrand v2.3.0
+    ├── getrandom v0.3.4
+    │   ├── cfg-if v1.0.4
+    │   └── libc v0.2.180
+    ├── once_cell v1.21.3
+    └── rustix v1.1.3
+        ├── bitflags v2.10.0
+        └── linux-raw-sys v0.11.0
+
+candy-diagnostics v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-diagnostics) (*)
+
+candy-ir v0.1.0 (/home/nesrine/projects/Candy/candy/crates/candy-ir)
+
+candy-lexer v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-lexer) (*)
+
+candy-parser v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-parser) (*)
+
+candy-typecheck v0.2.0 (/home/nesrine/projects/Candy/candy/crates/candy-typecheck) (*)

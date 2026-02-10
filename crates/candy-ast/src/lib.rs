@@ -44,6 +44,7 @@ pub struct EffectSpec {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Program {
     pub funcs: Vec<FnDecl>,
+    pub protocols: Vec<ProtocolDecl>,
     pub span: Span,
 }
 
@@ -52,7 +53,7 @@ pub struct FnDecl {
     pub name: Ident,
     pub params: Vec<Param>,
     pub ret: Type,
-    pub effects: Vec<EffectSpec>, // v0.4: default pure when empty
+    pub effects: Vec<EffectSpec>, // default pure when empty
     pub body: Block,
     pub span: Span,
 }
@@ -137,6 +138,31 @@ impl Expr {
         }
     }
 }
+
+/* ---------------- Protocol DSL (v0.2) ---------------- */
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProtocolDecl {
+    pub name: Ident,
+    pub states: Vec<StateDecl>,
+    pub transitions: Vec<TransitionDecl>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StateDecl {
+    pub name: Ident,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransitionDecl {
+    pub from: Ident,
+    pub to: Ident,
+    pub span: Span,
+}
+
+/* ---------------- Small constructors ---------------- */
 
 pub fn ty_int(span: Span) -> Type {
     Type::Int { span }

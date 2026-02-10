@@ -1,4 +1,7 @@
-use candy_ast::{Block, Effect, EffectSpec, Expr, FnDecl, Ident, Param, Program, Stmt, Type};
+use candy_ast::{
+    Block, Effect, EffectSpec, Expr, FnDecl, Ident, Param, Program, ProtocolDecl, StateDecl, Stmt,
+    TransitionDecl, Type,
+};
 use candy_diagnostics::{Diagnostic, DiagnosticReport, Span};
 use candy_lexer::{Lexer, Token, TokenKind};
 
@@ -58,13 +61,30 @@ impl<'a> Parser<'a> {
 
     fn parse_program(&mut self) -> Program {
         let mut funcs = Vec::new();
+        let mut protocols = Vec::new();
         let start = Span::unknown(self.file.clone());
 
         while self.cur.kind != TokenKind::Eof {
-            funcs.push(self.parse_fn());
+            match self.cur.kind {
+                TokenKind::KwFn => funcs.push(self.parse_fn()),
+                TokenKind::ProtocolKw => protocols.push(self.parse_protocol()),
+                _ => {
+                    let sp = self.cur.span.clone();
+                    self.err(
+                        "parse-expected-top-level",
+                        "Expected top-level item: `fn` or `protocol`.",
+                        sp,
+                    );
+                    self.bump();
+                }
+            }
         }
 
-        Program { funcs, span: start }
+        Program {
+            funcs,
+            protocols,
+            span: start,
+        }
     }
 
     fn parse_fn(&mut self) -> FnDecl {
@@ -523,6 +543,118 @@ impl<'a> Parser<'a> {
                     span: sp,
                 }
             }
+        }
+    }
+
+    // -----------------------------
+    // Protocol parsing (v0.2.1+)
+    // Grammar (minimal):
+    //   protocol <Ident> { state <Ident>; transition <Ident> -> <Ident>; ... }
+    //
+    // Notes:
+    // - We keep it intentionally small: only `state` and `transition` items in a protocol body.
+    // - Errors are reported with spans; we try to recover by bumping.
+    fn parse_protocol(&mut self) -> ProtocolDecl {
+        // consume `protocol`
+        let proto_span = self.cur.span.clone();
+        self.bump();
+
+        let name = self.parse_ident("parse-expected-ident", "Expected protocol name identifier.");
+
+        self.expect_kind(
+            TokenKind::LBrace,
+            "parse-expected-lbrace",
+            "Expected `{` after protocol name.",
+        );
+
+        let mut states: Vec<StateDecl> = Vec::new();
+        let mut transitions: Vec<TransitionDecl> = Vec::new();
+
+        while self.cur.kind != TokenKind::RBrace && self.cur.kind != TokenKind::Eof {
+            match self.cur.kind {
+                TokenKind::StateKw => {
+                    states.push(self.parse_protocol_state());
+                }
+                TokenKind::TransitionKw => {
+                    transitions.push(self.parse_protocol_transition());
+                }
+                _ => {
+                    let sp = self.cur.span.clone();
+                    self.err(
+                        "parse-unexpected-token",
+                        "Unexpected token in protocol body (expected `state` or `transition`).",
+                        sp.clone(),
+                    );
+                    self.bump(); // recovery
+                }
+            }
+        }
+
+        self.expect_kind(
+            TokenKind::RBrace,
+            "parse-expected-rbrace",
+            "Expected `}` to end protocol body.",
+        );
+
+        ProtocolDecl {
+            name,
+            states,
+            transitions,
+            span: proto_span,
+        }
+    }
+
+    fn parse_protocol_state(&mut self) -> StateDecl {
+        let st_span = self.cur.span.clone(); // `state`
+        self.bump(); // consume `state`
+
+        let name = self.parse_ident(
+            "parse-expected-ident",
+            "Expected state name identifier after `state`.",
+        );
+
+        self.expect_kind(
+            TokenKind::Semi,
+            "parse-expected-semi",
+            "Expected `;` after state declaration.",
+        );
+
+        StateDecl {
+            name,
+            span: st_span,
+        }
+    }
+
+    fn parse_protocol_transition(&mut self) -> TransitionDecl {
+        let tr_span = self.cur.span.clone(); // `transition`
+        self.bump(); // consume `transition`
+
+        let from = self.parse_ident(
+            "parse-expected-ident",
+            "Expected source state identifier after `transition`.",
+        );
+
+        self.expect_kind(
+            TokenKind::Arrow,
+            "parse-expected-arrow",
+            "Expected `->` in transition declaration.",
+        );
+
+        let to = self.parse_ident(
+            "parse-expected-ident",
+            "Expected destination state identifier after `->`.",
+        );
+
+        self.expect_kind(
+            TokenKind::Semi,
+            "parse-expected-semi",
+            "Expected `;` after transition declaration.",
+        );
+
+        TransitionDecl {
+            from,
+            to,
+            span: tr_span,
         }
     }
 }

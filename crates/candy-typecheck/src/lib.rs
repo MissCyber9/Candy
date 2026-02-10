@@ -95,6 +95,12 @@ pub fn typecheck(p: &Program) -> Result<(), DiagnosticReport> {
 
     check_main(p, &mut r);
 
+    typecheck_protocols(&p.protocols, &mut r);
+
+    typecheck_protocols(&p.protocols, &mut r);
+
+    typecheck_protocols(&p.protocols, &mut r);
+
     for f in &p.funcs {
         typecheck_fn(f, &fn_effects, &mut r);
     }
@@ -596,6 +602,43 @@ fn type_of_expr(
                 is_secret: false,
                 copied_secret: false,
                 name_hint: None,
+            }
+        }
+    }
+}
+
+fn typecheck_protocols(protocols: &[candy_ast::ProtocolDecl], r: &mut DiagnosticReport) {
+    use std::collections::HashSet;
+
+    for proto in protocols {
+        let mut states: HashSet<&str> = HashSet::new();
+
+        for st in &proto.states {
+            let n = st.name.name.as_str();
+            if !states.insert(n) {
+                r.push(Diagnostic::error(
+                    "protocol-duplicate-state",
+                    format!(
+                        "Duplicate state `{}` in protocol `{}`.",
+                        st.name.name, proto.name.name
+                    ),
+                    st.span.clone(),
+                ));
+            }
+        }
+
+        for tr in &proto.transitions {
+            let from_ok = states.contains(tr.from.name.as_str());
+            let to_ok = states.contains(tr.to.name.as_str());
+            if !(from_ok && to_ok) {
+                r.push(Diagnostic::error(
+                    "protocol-unknown-state",
+                    format!(
+                        "Transition `{}` -> `{}` references unknown state in protocol `{}`.",
+                        tr.from.name, tr.to.name, proto.name.name
+                    ),
+                    tr.span.clone(),
+                ));
             }
         }
     }

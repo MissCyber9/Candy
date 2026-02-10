@@ -2,6 +2,10 @@ use candy_diagnostics::Span;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenKind {
+    ProtocolKw,
+    StateKw,
+    TransitionKw,
+
     Ident(String),
     IntLit(i64),
     StrLit(String),
@@ -248,6 +252,9 @@ impl<'a> Lexer<'a> {
                 "if" => TokenKind::KwIf,
                 "else" => TokenKind::KwElse,
                 "effects" => TokenKind::KwEffects,
+                "protocol" => TokenKind::ProtocolKw,
+                "state" => TokenKind::StateKw,
+                "transition" => TokenKind::TransitionKw,
                 _ => TokenKind::Ident(s),
             };
 

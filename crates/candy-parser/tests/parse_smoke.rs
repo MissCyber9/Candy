@@ -16,7 +16,7 @@ fn parse_reports_error_with_span() {
     assert!(!err.diagnostics.is_empty());
 
     let d0 = &err.diagnostics[0];
-    assert_eq!(d0.code, "parse-expected-fn");
+    assert_eq!(d0.code, "parse-expected-top-level");
     assert_eq!(d0.span.file, "main.candy");
     assert!(d0.span.start_line >= 1);
     assert!(d0.span.start_col >= 1);

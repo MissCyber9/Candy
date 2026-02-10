@@ -97,10 +97,6 @@ pub fn typecheck(p: &Program) -> Result<(), DiagnosticReport> {
 
     typecheck_protocols(&p.protocols, &mut r);
 
-    typecheck_protocols(&p.protocols, &mut r);
-
-    typecheck_protocols(&p.protocols, &mut r);
-
     for f in &p.funcs {
         typecheck_fn(f, &fn_effects, &mut r);
     }
@@ -608,34 +604,71 @@ fn type_of_expr(
 }
 
 fn typecheck_protocols(protocols: &[candy_ast::ProtocolDecl], r: &mut DiagnosticReport) {
-    use std::collections::HashSet;
+    use std::collections::BTreeSet;
 
     for proto in protocols {
-        let mut states: HashSet<&str> = HashSet::new();
+        // ---- collect states + duplicate detection ----
+        let mut states: BTreeSet<String> = BTreeSet::new();
 
         for st in &proto.states {
-            let n = st.name.name.as_str();
-            if !states.insert(n) {
+            let name = st.name.name.clone();
+            if !states.insert(name.clone()) {
                 r.push(Diagnostic::error(
                     "protocol-duplicate-state",
                     format!(
                         "Duplicate state `{}` in protocol `{}`.",
-                        st.name.name, proto.name.name
+                        name, proto.name.name
                     ),
-                    st.span.clone(),
+                    st.name.span.clone(),
                 ));
             }
         }
 
+        // ---- empty protocol ----
+        if states.is_empty() {
+            r.push(Diagnostic::error(
+                "protocol-empty",
+                format!("Protocol `{}` declares no states.", proto.name.name),
+                proto.span.clone(),
+            ));
+        }
+
+        // ---- transitions: unknown state + duplicate edge ----
+        let mut seen_edges: BTreeSet<(String, String)> = BTreeSet::new();
+
         for tr in &proto.transitions {
-            let from_ok = states.contains(tr.from.name.as_str());
-            let to_ok = states.contains(tr.to.name.as_str());
-            if !(from_ok && to_ok) {
+            let from = tr.from.name.clone();
+            let to = tr.to.name.clone();
+
+            if !states.contains(&from) {
                 r.push(Diagnostic::error(
                     "protocol-unknown-state",
                     format!(
-                        "Transition `{}` -> `{}` references unknown state in protocol `{}`.",
-                        tr.from.name, tr.to.name, proto.name.name
+                        "Transition references unknown state `{}` in protocol `{}`.",
+                        from, proto.name.name
+                    ),
+                    tr.from.span.clone(),
+                ));
+            }
+
+            if !states.contains(&to) {
+                r.push(Diagnostic::error(
+                    "protocol-unknown-state",
+                    format!(
+                        "Transition references unknown state `{}` in protocol `{}`.",
+                        to, proto.name.name
+                    ),
+                    tr.to.span.clone(),
+                ));
+            }
+
+            let edge = (from.clone(), to.clone());
+            if !seen_edges.insert(edge) {
+                r.push(Diagnostic::error(
+                    "protocol-duplicate-transition",
+                    format!(
+                        "Duplicate transition `{}` -> `{}` in protocol `{}`.",
+                        from, to, proto.name.name
                     ),
                     tr.span.clone(),
                 ));

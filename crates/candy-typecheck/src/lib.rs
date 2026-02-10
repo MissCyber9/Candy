@@ -604,148 +604,191 @@ fn type_of_expr(
 }
 
 fn typecheck_protocols(protocols: &[candy_ast::ProtocolDecl], r: &mut DiagnosticReport) {
-    use std::collections::{BTreeMap, BTreeSet, VecDeque};
+    use std::collections::{HashMap, HashSet};
 
     for proto in protocols {
-        // ---- collect states + duplicate detection ----
-        let mut states: BTreeSet<String> = BTreeSet::new();
+        // 1) protocol-empty: must have at least 1 state
+        if proto.states.is_empty() {
+            r.push(Diagnostic::error(
+                "protocol-empty",
+                format!(
+                    "Protocol `{}` must declare at least one state.",
+                    proto.name.name
+                ),
+                proto.span.clone(),
+            ));
+            // still continue to collect more errors safely
+        }
+
+        // 2) collect states + detect duplicates
+        let mut states: HashSet<&str> = HashSet::new();
+        let mut is_final: HashMap<&str, bool> = HashMap::new();
 
         for st in &proto.states {
-            let name = st.name.name.clone();
-            if !states.insert(name.clone()) {
+            let n = st.name.name.as_str();
+            if !states.insert(n) {
                 r.push(Diagnostic::error(
                     "protocol-duplicate-state",
                     format!(
                         "Duplicate state `{}` in protocol `{}`.",
-                        name, proto.name.name
+                        st.name.name, proto.name.name
                     ),
-                    st.name.span.clone(),
+                    st.span.clone(),
                 ));
             }
+            is_final.insert(n, st.is_final);
         }
-
-        // ---- empty protocol ----
-        if states.is_empty() {
-            r.push(Diagnostic::error(
-                "protocol-empty",
-                format!("Protocol `{}` declares no states.", proto.name.name),
-                proto.span.clone(),
-            ));
-            continue; // nothing else to do safely
-        }
-
-        // ---- init rule (v0.5.x convention) ----
-        let init = "Init".to_string();
-        if !states.contains(&init) {
+        // Initial state rule: `Init` is mandatory and reserved as the protocol entry state.
+        if !states.contains("Init") {
             r.push(Diagnostic::error(
                 "protocol-missing-init",
-                format!("Protocol `{}` must declare state `Init`.", proto.name.name),
+                format!("Protocol `{}` must declare `state Init;`.", proto.name.name),
                 proto.span.clone(),
             ));
+            // Avoid cascading errors that depend on initial reachability.
+            /* removed early-exit */
         }
 
-        // ---- transitions: unknown state + duplicate edge ----
-        let mut seen_edges: BTreeSet<(String, String)> = BTreeSet::new();
-        let mut out_deg: BTreeMap<String, usize> = BTreeMap::new();
-        let mut adj: BTreeMap<String, Vec<String>> = BTreeMap::new();
-
-        for st in states.iter() {
-            out_deg.insert(st.clone(), 0);
-            adj.insert(st.clone(), Vec::new());
-        }
+        // 3) transitions: unknown states + duplicate transitions + out-degree
+        let mut seen_tr: HashSet<(&str, &str)> = HashSet::new();
+        let mut out_deg: HashMap<&str, usize> = HashMap::new();
 
         for tr in &proto.transitions {
-            let from = tr.from.name.clone();
-            let to = tr.to.name.clone();
+            let from = tr.from.name.as_str();
+            let to = tr.to.name.as_str();
 
-            if !states.contains(&from) {
+            let from_ok = states.contains(from);
+            let to_ok = states.contains(to);
+            if !(from_ok && to_ok) {
                 r.push(Diagnostic::error(
                     "protocol-unknown-state",
                     format!(
-                        "Transition references unknown state `{}` in protocol `{}`.",
-                        from, proto.name.name
-                    ),
-                    tr.from.span.clone(),
-                ));
-            }
-
-            if !states.contains(&to) {
-                r.push(Diagnostic::error(
-                    "protocol-unknown-state",
-                    format!(
-                        "Transition references unknown state `{}` in protocol `{}`.",
-                        to, proto.name.name
-                    ),
-                    tr.to.span.clone(),
-                ));
-            }
-
-            let edge = (from.clone(), to.clone());
-            if !seen_edges.insert(edge) {
-                r.push(Diagnostic::error(
-                    "protocol-duplicate-transition",
-                    format!(
-                        "Duplicate transition `{}` -> `{}` in protocol `{}`.",
-                        from, to, proto.name.name
+                        "Transition `{}` -> `{}` references unknown state in protocol `{}`.",
+                        tr.from.name, tr.to.name, proto.name.name
                     ),
                     tr.span.clone(),
                 ));
             }
 
-            // Only build graph for well-formed endpoints
-            if states.contains(&from) && states.contains(&to) {
-                if let Some(v) = out_deg.get_mut(&from) {
-                    *v += 1;
-                }
-                if let Some(v) = adj.get_mut(&from) {
-                    v.push(to);
-                }
-            }
-        }
-
-        // ---- reachability (unreachable states) ----
-        if states.contains(&init) {
-            let mut seen: BTreeSet<String> = BTreeSet::new();
-            let mut q: VecDeque<String> = VecDeque::new();
-            seen.insert(init.clone());
-            q.push_back(init.clone());
-
-            while let Some(cur) = q.pop_front() {
-                let nexts = adj.get(&cur).cloned().unwrap_or_default();
-                for n in nexts {
-                    if seen.insert(n.clone()) {
-                        q.push_back(n);
-                    }
-                }
-            }
-
-            for st in states.iter() {
-                if st != &init && !seen.contains(st) {
-                    r.push(Diagnostic::error(
-                        "protocol-unreachable-state",
-                        format!(
-                            "State `{}` is unreachable from `Init` in protocol `{}`.",
-                            st, proto.name.name
-                        ),
-                        proto.span.clone(),
-                    ));
-                }
-            }
-        }
-
-        // ---- dead-end states (no outgoing transitions) ----
-        for st in states.iter() {
-            let deg = *out_deg.get(st).unwrap_or(&0);
-            if deg == 0 {
+            if !seen_tr.insert((from, to)) {
                 r.push(Diagnostic::error(
-                    "protocol-dead-end-state",
+                    "protocol-duplicate-transition",
                     format!(
-                        "State `{}` has no outgoing transitions in protocol `{}`.",
-                        st, proto.name.name
+                        "Duplicate transition `{}` -> `{}` in protocol `{}`.",
+                        tr.from.name, tr.to.name, proto.name.name
+                    ),
+                    tr.span.clone(),
+                ));
+            }
+
+            *out_deg.entry(from).or_insert(0) += 1;
+        }
+
+        // 4) protocol-final-has-outgoing + protocol-dead-end-state + protocol-nondeterministic
+        // - nondeterministic: >1 outgoing from same state
+        for (from, n) in &out_deg {
+            if *n > 1 {
+                // use proto.span for now; if you later store per-state span, attach it.
+                r.push(Diagnostic::error(
+                    "protocol-nondeterministic",
+                    format!(
+                        "State `{}` in protocol `{}` has {} outgoing transitions (nondeterministic).",
+                        from, proto.name.name, n
                     ),
                     proto.span.clone(),
                 ));
             }
+        }
+
+        for st in &proto.states {
+            let n = st.name.name.as_str();
+            let out = *out_deg.get(n).unwrap_or(&0);
+
+            if st.is_final && out > 0 {
+                r.push(Diagnostic::error(
+                    "protocol-final-has-outgoing",
+                    format!(
+                        "Final state `{}` in protocol `{}` must not have outgoing transitions.",
+                        st.name.name, proto.name.name
+                    ),
+                    st.span.clone(),
+                ));
+            }
+
+            if !st.is_final && out == 0 {
+                r.push(Diagnostic::error(
+                    "protocol-dead-end-state",
+                    format!(
+                        "State `{}` in protocol `{}` has no outgoing transitions.",
+                        st.name.name, proto.name.name
+                    ),
+                    st.span.clone(),
+                ));
+            }
+        }
+
+        // PHASE5_REACHABILITY: global validation (reachability + final reachability)
+        if proto.states.is_empty() {
+            // protocol-empty should already be emitted earlier; keep consistent and don't panic.
+            continue;
+        }
+
+        let init = "Init".to_string();
+
+        let mut adj: std::collections::HashMap<String, Vec<String>> =
+            std::collections::HashMap::new();
+        for tr in &proto.transitions {
+            adj.entry(tr.from.name.clone())
+                .or_default()
+                .push(tr.to.name.clone());
+        }
+
+        let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut stack: Vec<String> = vec![init.clone()];
+
+        while let Some(n) = stack.pop() {
+            if !visited.insert(n.clone()) {
+                continue;
+            }
+            if let Some(ns) = adj.get(&n) {
+                for to in ns {
+                    if !visited.contains(to) {
+                        stack.push(to.clone());
+                    }
+                }
+            }
+        }
+
+        for st in &proto.states {
+            if !visited.contains(&st.name.name) {
+                r.push(Diagnostic::error(
+                    "protocol-unreachable-state",
+                    format!(
+                        "State `{}` is unreachable from initial state `{}` in protocol `{}`.",
+                        st.name.name, init, proto.name.name
+                    ),
+                    st.span.clone(),
+                ));
+            }
+        }
+
+        let mut any_final_reachable = false;
+        for st in &proto.states {
+            if st.is_final && visited.contains(&st.name.name) {
+                any_final_reachable = true;
+                break;
+            }
+        }
+
+        if !any_final_reachable {
+            r.push(Diagnostic::error(
+                "protocol-no-final-reachable",
+                format!(
+                    "No final state is reachable from initial state `{}` in protocol `{}`.",
+                    init, proto.name.name
+                ),
+                proto.span.clone(),
+            ));
         }
     }
 }

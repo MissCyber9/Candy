@@ -10,10 +10,10 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 2 tests
-test agent_reports_effect_leak_for_call ... ok
 test agent_reports_undeclared_effect_for_log ... ok
+test agent_reports_effect_leak_for_call ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 1 test
@@ -23,9 +23,9 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 3 tests
-test agent_reports_use_after_move ... ok
-test agent_reports_secret_branch ... ok
 test agent_reports_secret_copy ... ok
+test agent_reports_secret_branch ... ok
+test agent_reports_use_after_move ... ok
 
 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
@@ -67,12 +67,18 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 running 5 tests
 test lex_if_else_keywords ... ok
-test lex_int_literal_span_is_nonzero ... ok
-test lex_keywords_and_symbols_with_spans ... ok
 test lex_secret_keyword ... ok
+test lex_keywords_and_symbols_with_spans ... ok
+test lex_int_literal_span_is_nonzero ... ok
 test lex_spans_across_newlines ... ok
 
 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test lex_protocol_final_keyword ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 1 test
@@ -108,20 +114,52 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 5 tests
-test effect_declared_allows_intrinsic ... ok
 test effect_leak_through_call_is_error ... ok
+test effect_declared_allows_intrinsic ... ok
 test missing_effect_for_log_is_error ... ok
-test missing_effect_for_rand_is_error ... ok
 test missing_effect_for_now_is_error ... ok
+test missing_effect_for_rand_is_error ... ok
 
 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 2 tests
-test protocol_unknown_state_in_transition_is_error ... ok
 test protocol_duplicate_state_is_error ... ok
+test protocol_unknown_state_in_transition_is_error ... ok
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test protocol_empty_is_error ... ok
+test protocol_duplicate_transition_is_error ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test protocol_dead_end_state_is_error ... ok
+test protocol_missing_init_is_error ... ok
+test protocol_unreachable_state_is_error ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test dead_end_non_final_is_error ... ok
+test final_state_allows_dead_end ... ok
+test final_with_outgoing_is_error ... ok
+test nondeterministic_outgoing_is_error ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test ok_when_final_reachable ... ok
+test no_final_reachable_is_error ... ok
+test unreachable_state_is_error ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 1 test
@@ -139,8 +177,8 @@ test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 3 tests
-test main_ok_unit_return ... ok
 test main_invalid_return_type ... ok
+test main_ok_unit_return ... ok
 test unknown_name_is_error ... ok
 
 test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

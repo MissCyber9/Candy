@@ -152,6 +152,7 @@ pub struct ProtocolDecl {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StateDecl {
     pub name: Ident,
+    pub is_final: bool,
     pub span: Span,
 }
 

@@ -6,6 +6,7 @@ pub enum TokenKind {
     StateKw,
     TransitionKw,
 
+    FinalKw,
     Ident(String),
     IntLit(i64),
     StrLit(String),
@@ -255,6 +256,7 @@ impl<'a> Lexer<'a> {
                 "protocol" => TokenKind::ProtocolKw,
                 "state" => TokenKind::StateKw,
                 "transition" => TokenKind::TransitionKw,
+                "final" => TokenKind::FinalKw,
                 _ => TokenKind::Ident(s),
             };
 

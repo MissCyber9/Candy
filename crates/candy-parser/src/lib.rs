@@ -572,7 +572,7 @@ impl<'a> Parser<'a> {
 
         while self.cur.kind != TokenKind::RBrace && self.cur.kind != TokenKind::Eof {
             match self.cur.kind {
-                TokenKind::StateKw => {
+                TokenKind::StateKw | TokenKind::FinalKw => {
                     states.push(self.parse_protocol_state());
                 }
                 TokenKind::TransitionKw => {
@@ -603,15 +603,26 @@ impl<'a> Parser<'a> {
             span: proto_span,
         }
     }
-
     fn parse_protocol_state(&mut self) -> StateDecl {
-        let st_span = self.cur.span.clone(); // `state`
-        self.bump(); // consume `state`
+        // Accept:
+        //   state Name;
+        //   final state Name;
 
-        let name = self.parse_ident(
-            "parse-expected-ident",
-            "Expected state name identifier after `state`.",
+        let start_span = self.cur.span.clone();
+
+        let mut is_final = false;
+        if self.cur.kind == TokenKind::FinalKw {
+            is_final = true;
+            self.bump(); // consume `final`
+        }
+
+        self.expect_kind(
+            TokenKind::StateKw,
+            "parse-expected-state",
+            "Expected `state` in protocol body (or `final state`).",
         );
+
+        let name = self.parse_ident("parse-expected-ident", "Expected state name identifier.");
 
         self.expect_kind(
             TokenKind::Semi,
@@ -621,7 +632,8 @@ impl<'a> Parser<'a> {
 
         StateDecl {
             name,
-            span: st_span,
+            is_final,
+            span: start_span,
         }
     }
 
